@@ -1,0 +1,374 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release manually, without the leading v
+        required: false
+        type: string
+      publish_mode:
+        description: Whether to publish a GitHub release or only build artifacts
+        required: true
+        default: internal
+        type: choice
+        options:
+          - internal
+          - release
+      ref:
+        description: Git ref to build for manual runs
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: scriptflow-electron
+
+jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.release_meta.outputs.version }}
+      tag: ${{ steps.release_meta.outputs.tag }}
+      release_name: ${{ steps.release_meta.outputs.release_name }}
+      is_internal: ${{ steps.release_meta.outputs.is_internal }}
+      is_prerelease: ${{ steps.release_meta.outputs.is_prerelease }}
+      make_latest: ${{ steps.release_meta.outputs.make_latest }}
+      ref: ${{ steps.release_meta.outputs.ref }}
+      previous_tag: ${{ steps.previous_tag.outputs.previous_tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: scriptflow-electron/package.json
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('scriptflow-electron/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - run: bun install --frozen-lockfile
+
+      - id: release_meta
+        name: Resolve release metadata
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION_INPUT="${{ github.event.inputs.version }}"
+            PUBLISH_MODE="${{ github.event.inputs.publish_mode }}"
+            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+            if [[ "$PUBLISH_MODE" == "release" ]]; then
+              if [[ -z "$VERSION_INPUT" ]]; then
+                echo "workflow_dispatch releases require the version input." >&2
+                exit 1
+              fi
+
+              VERSION="$VERSION_INPUT"
+              TAG="v$VERSION"
+              RELEASE_NAME="ScriptFlow v$VERSION"
+              IS_INTERNAL=false
+            else
+              VERSION="${VERSION_INPUT:-$PACKAGE_VERSION}"
+              TAG=""
+              RELEASE_NAME="ScriptFlow internal $VERSION"
+              IS_INTERNAL=true
+            fi
+          else
+            VERSION=${GITHUB_REF_NAME#v}
+            TAG="$GITHUB_REF_NAME"
+            RELEASE_NAME="ScriptFlow v$VERSION"
+            IS_INTERNAL=false
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release version: ${VERSION}" >&2
+            exit 1
+          fi
+
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            IS_PRERELEASE=false
+            MAKE_LATEST=true
+          else
+            IS_PRERELEASE=true
+            MAKE_LATEST=false
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+          echo "is_internal=$IS_INTERNAL" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "make_latest=$MAKE_LATEST" >> "$GITHUB_OUTPUT"
+          echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Format
+        run: bun run fmt:check
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - id: previous_tag
+        name: Resolve previous release tag
+        if: steps.release_meta.outputs.is_internal == 'false'
+        shell: bash
+        run: |
+          CURRENT_TAG="${{ steps.release_meta.outputs.tag }}"
+          PREVIOUS_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | grep -v "^${CURRENT_TAG}$" | head -n 1)
+          echo "previous_tag=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            echo "Previous release tag: $PREVIOUS_TAG"
+          else
+            echo "No previous release tag found (first release)."
+          fi
+
+  build:
+    name: Build (${{ matrix.label }})
+    needs: preflight
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS arm64
+            os: macos-15
+            platform: mac
+            arch: arm64
+            target: dmg
+          # Temporarily disabled pending mac-intel pipeline fixes.
+          # - label: macOS x64
+          #   os: macos-15-intel
+          #   platform: mac
+          #   arch: x64
+          #   target: dmg
+          - label: Windows x64
+            os: windows-2022
+            platform: win
+            arch: x64
+            target: nsis
+          - label: Linux x64
+            os: ubuntu-24.04
+            platform: linux
+            arch: x64
+            target: AppImage
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: scriptflow-electron/package.json
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('scriptflow-electron/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build & Package
+        shell: bash
+        env:
+          SCRIPTFLOW_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
+          AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          AZURE_TRUSTED_SIGNING_PUBLISHER_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_PUBLISHER_NAME }}
+        run: |
+          bun run dist:desktop:artifact --platform ${{ matrix.platform }} --target ${{ matrix.target }} --arch ${{ matrix.arch }} --build-version ${{ needs.preflight.outputs.version }} --output-dir release-assets
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.arch }}-release-artifacts
+          path: |
+            scriptflow-electron/release-assets/*
+          if-no-files-found: error
+          retention-days: ${{ needs.preflight.outputs.is_internal == 'true' && 1 || 5 }}
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [preflight, build]
+    if: ${{ !failure() && !cancelled() && needs.preflight.outputs.is_internal == 'false' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: scriptflow-electron/package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: '*-release-artifacts'
+          merge-multiple: true
+          path: scriptflow-electron/release-assets
+
+      - name: Merge macOS updater manifests
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for x64_manifest in release-assets/*-mac-x64.yml; do
+            arm64_manifest="${x64_manifest%-x64.yml}.yml"
+            if [[ -f "$arm64_manifest" ]]; then
+              bun run scripts/merge-update-manifests.ts --platform mac "$arm64_manifest" "$x64_manifest"
+              rm -f "$x64_manifest"
+            fi
+          done
+
+      - name: Publish GitHub Release (with previous tag)
+        if: needs.preflight.outputs.previous_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.preflight.outputs.tag }}
+          target_commitish: ${{ needs.preflight.outputs.ref }}
+          name: ${{ needs.preflight.outputs.release_name }}
+          generate_release_notes: true
+          previous_tag: ${{ needs.preflight.outputs.previous_tag }}
+          prerelease: ${{ needs.preflight.outputs.is_prerelease }}
+          make_latest: ${{ needs.preflight.outputs.make_latest }}
+          files: |
+            scriptflow-electron/release-assets/*.dmg
+            scriptflow-electron/release-assets/*.zip
+            scriptflow-electron/release-assets/*.exe
+            scriptflow-electron/release-assets/*.AppImage
+            scriptflow-electron/release-assets/*.blockmap
+            scriptflow-electron/release-assets/*.yml
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GitHub Release (first release)
+        if: needs.preflight.outputs.previous_tag == ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.preflight.outputs.tag }}
+          target_commitish: ${{ needs.preflight.outputs.ref }}
+          name: ${{ needs.preflight.outputs.release_name }}
+          generate_release_notes: true
+          prerelease: ${{ needs.preflight.outputs.is_prerelease }}
+          make_latest: ${{ needs.preflight.outputs.make_latest }}
+          files: |
+            scriptflow-electron/release-assets/*.dmg
+            scriptflow-electron/release-assets/*.zip
+            scriptflow-electron/release-assets/*.exe
+            scriptflow-electron/release-assets/*.AppImage
+            scriptflow-electron/release-assets/*.blockmap
+            scriptflow-electron/release-assets/*.yml
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  finalize:
+    name: Finalize Release
+    needs: [preflight, publish-release]
+    if: ${{ !failure() && !cancelled() && needs.preflight.outputs.is_internal == 'false' && needs.publish-release.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: scriptflow-electron/package.json
+
+      - name: Update package.json version
+        shell: bash
+        run: |
+          RELEASE_VERSION="${{ needs.preflight.outputs.version }}"
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          if [[ "$CURRENT_VERSION" == "$RELEASE_VERSION" ]]; then
+            echo "package.json already at $RELEASE_VERSION — nothing to commit."
+            echo "SKIP_COMMIT=true" >> $GITHUB_ENV
+          else
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              pkg.version = '$RELEASE_VERSION';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 4) + '\n');
+            "
+            echo "SKIP_COMMIT=false" >> $GITHUB_ENV
+          fi
+
+      - name: Commit and push version bump
+        if: env.SKIP_COMMIT == 'false'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add package.json
+          git commit -m "chore(release): bump version to ${{ needs.preflight.outputs.tag }}"
+          git push origin HEAD:main

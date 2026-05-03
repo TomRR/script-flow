@@ -1,0 +1,371 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tomrr/script-flow/main/schemas/scriptflow.schema.json",
+  "version": "1.0.0",
+  "sections": [
+    {
+      "id": "75acc356-bf2c-43de-bf5d-82565d16f17e",
+      "title": "Tests",
+      "sub-sections": {
+        "b0e99130-974e-4a38-b15b-92e35115da53": {
+          "title": "Test2",
+          "placement": 0,
+          "scripts": [
+            {
+              "type": "python",
+              "path": "helloworld.py",
+              "name": "helloworld",
+              "placement": 0,
+              "id": "f3a7a966-3c17-4299-81e6-73e4778a5963",
+              "successCondition": {
+                "type": "contains",
+                "value": "",
+                "enabled": true,
+                "setEnvVar": true,
+                "envVarName": "TEST"
+              }
+            },
+            {
+              "type": "python",
+              "path": "helloworld.cs",
+              "name": "helloworld",
+              "placement": 1,
+              "id": "8d156c99-dc55-4178-8597-243e9de955d1"
+            },
+            {
+              "type": "bash",
+              "path": "helloworld.sh",
+              "name": "helloworld",
+              "placement": 2,
+              "id": "b9217e03-0713-4b13-a1de-1b6bdc9452de"
+            }
+          ]
+        },
+        "c2ff4d36-b9b7-478f-be87-a1568e84cc54": {
+          "title": "Test1",
+          "placement": 1,
+          "scripts": [
+            {
+              "type": "python",
+              "path": "",
+              "id": "96f8d518-600b-492b-9994-7adc414b23b9",
+              "placement": 0,
+              "secrets": [
+                "SECRET_VAR",
+                "TOKEN"
+              ],
+              "env": {
+                "1232131": "123123",
+                "GIT": "http://",
+                "TESTS": "testtest"
+              }
+            },
+            {
+              "type": "csharp",
+              "path": "",
+              "id": "09cbd149-2165-499f-8b8f-68b68693254a",
+              "placement": 1,
+              "successCondition": {
+                "type": "startsWith",
+                "value": "",
+                "enabled": true
+              },
+              "env": {
+                "1232131": "123123",
+                "d": {
+                  "type": "static",
+                  "value": "dd"
+                },
+                "RADIIO": {
+                  "type": "multi-value",
+                  "display": "radio",
+                  "values": [
+                    "Teset",
+                    "TESTss",
+                    "aaa"
+                  ],
+                  "defaultValue": 1
+                },
+                "TTT": {
+                  "type": "multi-value",
+                  "display": "dropdown",
+                  "values": [
+                    "sdfs",
+                    "sdf2"
+                  ],
+                  "defaultValue": 0
+                },
+                "TEST": {
+                  "type": "static",
+                  "value": "4444"
+                }
+              },
+              "secrets": []
+            },
+            {
+              "type": "csharp",
+              "path": "",
+              "id": "409a05d2-18be-45a8-9c78-37e097d2c5df",
+              "placement": 2,
+              "successCondition": {
+                "type": "equals",
+                "value": "",
+                "enabled": true
+              },
+              "env": {
+                "1232131": "123123"
+              }
+            },
+            {
+              "type": "bash",
+              "path": "",
+              "placement": 3,
+              "id": "be01f529-cb42-484d-b49a-045aa34278eb"
+            }
+          ]
+        },
+        "bb90e52a-2b11-4d96-a8a5-f6d8f1dfed70": {
+          "title": "Tests",
+          "placement": 2,
+          "scripts": [
+            {
+              "id": "1af890cc-2d46-4834-81e9-5ab0f836f3f2",
+              "type": "csharp",
+              "path": "examples/hello.cs",
+              "successCondition": {
+                "type": "contains",
+                "value": "Hello fromg C#",
+                "enabled": false,
+                "setEnvVar": true,
+                "envVarName": "INPUT_VAR"
+              },
+              "secrets": [],
+              "env": {},
+              "name": "C-Sharp - 4 sec delay",
+              "placement": 0
+            },
+            {
+              "id": "08584e75-63db-4c14-acd6-b0f8c88e5e63",
+              "type": "bash",
+              "path": "examples/hello.sh",
+              "successCondition": {
+                "type": "contains",
+                "value": "Bash",
+                "enabled": true,
+                "setEnvVar": true,
+                "envVarName": "INPUT_VAR"
+              },
+              "secrets": [],
+              "env": {
+                "ENV_VAR": {
+                  "type": "static",
+                  "value": "C# Testshhhw1"
+                },
+                "NEW_ERA": {
+                  "type": "multi-value",
+                  "display": "dropdown",
+                  "values": [
+                    "1",
+                    "2",
+                    "3"
+                  ],
+                  "defaultValue": 0
+                },
+                "TESTER": "newer_erst1"
+              },
+              "name": "Bash",
+              "placement": 1
+            },
+            {
+              "id": "38062e8c-b1a9-4fdf-8b2b-8ebd58a4ec78",
+              "type": "python",
+              "path": "examples/hello.py",
+              "secrets": [
+                "SECRET_VAR"
+              ],
+              "env": {
+                "ENV_VAR": {
+                  "type": "static",
+                  "value": "C# Testshhhw1"
+                }
+              },
+              "name": "Python",
+              "placement": 2
+            }
+          ]
+        }
+      },
+      "placement": 0
+    },
+    {
+      "id": "20ad5664-2b46-4f70-b70a-d87467bc2466",
+      "title": "Create Tag",
+      "sub-sections": {
+        "5f9e7eb2-1ef1-4aaa-8a05-9db07159c8c3": {
+          "title": "Database Tags",
+          "placement": 0,
+          "scripts": [
+            {
+              "id": "c544c062-0277-4402-b875-b869fe74e55c",
+              "type": "bash",
+              "path": "helloworld.sh",
+              "env": {
+                "TOKEN": "12342"
+              },
+              "placement": 0,
+              "name": "sdshh",
+              "secrets": [
+                "JIT_TOKEN"
+              ]
+            },
+            {
+              "id": "9db13d2e-f4be-4cf0-bf3f-700385a55125",
+              "type": "csharp",
+              "path": "helloworld.cs",
+              "env": {
+                "TOKEN": "12342sddhhjh"
+              },
+              "secrets": [
+                "JIT_TOKEN"
+              ],
+              "successCondition": {
+                "type": "contains",
+                "value": "stop",
+                "enabled": true
+              },
+              "name": "sdsd",
+              "placement": 1
+            },
+            {
+              "id": "af3ebfb4-f73a-4a87-8663-e78ff11fd4fa",
+              "type": "python",
+              "path": "helloworld.py",
+              "env": {
+                "TOKEN": "123477"
+              },
+              "secrets": [
+                "SECRET_VAR"
+              ],
+              "successCondition": {
+                "type": "equals",
+                "value": "This line ",
+                "enabled": true,
+                "setEnvVar": true
+              },
+              "name": "Test",
+              "placement": 2
+            }
+          ]
+        },
+        "fb054707-2123-4f37-962b-95ae77676f8b": {
+          "title": "Database Tags New",
+          "placement": 1,
+          "scripts": [
+            {
+              "id": "501aef8b-dc3f-46fc-8032-b272a2447cd6",
+              "type": "python",
+              "path": "helloworld.py",
+              "env": {
+                "TOKEN": "123477"
+              },
+              "secrets": [],
+              "successCondition": {
+                "type": "equals",
+                "value": "This line ",
+                "enabled": true,
+                "setEnvVar": true
+              },
+              "name": "Test"
+            },
+            {
+              "id": "fda178d2-3ae1-4f54-a6ea-7136cc7d415c",
+              "type": "csharp",
+              "path": "helloworld.cs",
+              "env": {
+                "TOKEN": "12342"
+              },
+              "secrets": [
+                "TOKE"
+              ],
+              "successCondition": {
+                "type": "startsWith",
+                "value": "kka",
+                "enabled": true
+              }
+            },
+            {
+              "id": "1e7cd573-05dd-414a-bccc-df137615a48a",
+              "type": "bash",
+              "path": "helloworld.sh",
+              "env": {
+                "TOKEN": "12342"
+              }
+            }
+          ]
+        },
+        "09fc7b4d-3aba-4584-b718-6042a8fdf48c": {
+          "title": "Database Tags New",
+          "placement": 2,
+          "scripts": [
+            {
+              "id": "8fca6b73-5990-4107-ab6c-a5346b8d51b7",
+              "type": "python",
+              "path": "helloworld.py",
+              "env": {
+                "TOKEN": "12342"
+              },
+              "secrets": [
+                "TOKE"
+              ],
+              "successCondition": {
+                "type": "contains",
+                "value": "This line ",
+                "enabled": true,
+                "setEnvVar": true
+              },
+              "name": "Test",
+              "placement": 0
+            },
+            {
+              "id": "0240050a-2df1-4d0c-879a-446b1a240605",
+              "type": "csharp",
+              "path": "helloworld.cs",
+              "env": {
+                "TOKEN": "12342"
+              },
+              "secrets": [
+                "TOKE"
+              ],
+              "successCondition": {
+                "type": "startsWith",
+                "value": "kka",
+                "enabled": true
+              },
+              "placement": 1,
+              "name": "RRR"
+            },
+            {
+              "id": "6500fde6-80df-49eb-9c51-b94305e41b3f",
+              "type": "bash",
+              "path": "helloworld.sh",
+              "env": {
+                "TOKEN": "12342"
+              },
+              "placement": 2
+            }
+          ]
+        },
+        "1d04a9ee-5b50-4a45-b673-312efca99d7e": {
+          "title": "Test3",
+          "placement": 3,
+          "scripts": []
+        },
+        "5841530f-4b29-4d29-8f06-be1a3cc9c677": {
+          "title": "Test2 New",
+          "placement": 4,
+          "scripts": []
+        }
+      },
+      "placement": 1
+    }
+  ]
+}

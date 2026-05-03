@@ -1,0 +1,5 @@
+Write-Host "Line 1: starting process"
+Write-Host "Line 2: loading data"
+Write-Host "Line 3: processing records"
+Write-Host "Line 4: almost done"
+Write-Host "COMPLETE"

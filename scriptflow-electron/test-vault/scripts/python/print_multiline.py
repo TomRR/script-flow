@@ -1,0 +1,5 @@
+print("Line 1: starting process")
+print("Line 2: loading data")
+print("Line 3: processing records")
+print("Line 4: almost done")
+print("COMPLETE")

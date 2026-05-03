@@ -1,0 +1,53 @@
+# --- Dependencies ---
+node_modules/
+bun.lockb
+
+# --- Tooling ---
+.opencode/
+
+# --- Build & Distribution ---
+# React build output
+dist/
+build/
+
+# Electron-builder/Packager output
+dist_electron/
+dist-electron/
+out/
+release/
+
+# --- Environment & Secrets ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+logs/
+*.log
+
+# --- Jest & Testing ---
+coverage/
+.jest/
+junit.xml
+
+# --- OS & IDE Specific ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# --- Electron Specific ---
+# If you use electron-rebuild or native modules
+bin/
+obj/

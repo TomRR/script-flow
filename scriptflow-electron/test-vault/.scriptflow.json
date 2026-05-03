@@ -1,0 +1,644 @@
+{
+    "$schema": "https://raw.githubusercontent.com/tomrr/script-flow/main/schemas/scriptflow.schema.json",
+    "version": "1.0.0",
+    "sections": [
+        {
+            "id": "sec-basic-exec",
+            "title": "1. Basic Execution",
+            "placement": 0,
+            "sub-sections": {
+                "ss-basic-bash": {
+                    "title": "Bash - Basic",
+                    "placement": 0,
+                    "scripts": [
+                        {
+                            "id": "s-basic-bash",
+                            "name": "Basic Bash",
+                            "type": "bash",
+                            "path": "scripts/bash/basic.sh",
+                            "placement": 0
+                        }
+                    ]
+                },
+                "ss-basic-ps": {
+                    "title": "PowerShell - Basic",
+                    "placement": 1,
+                    "scripts": [
+                        {
+                            "id": "s-basic-ps",
+                            "name": "Basic PowerShell",
+                            "type": "powershell",
+                            "path": "scripts/powershell/basic.ps1",
+                            "placement": 0
+                        }
+                    ]
+                },
+                "ss-basic-py": {
+                    "title": "Python - Basic",
+                    "placement": 2,
+                    "scripts": [
+                        {
+                            "id": "s-basic-py",
+                            "name": "Basic Python",
+                            "type": "python",
+                            "path": "scripts/python/basic.py",
+                            "placement": 0
+                        }
+                    ]
+                },
+                "ss-basic-cs": {
+                    "title": "C# - Basic",
+                    "placement": 3,
+                    "scripts": [
+                        {
+                            "id": "s-basic-cs",
+                            "name": "Basic C#",
+                            "type": "csharp",
+                            "path": "scripts/csharp/Basic",
+                            "placement": 0
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": "sec-failure",
+            "title": "2. Failure Handling (expect RED)",
+            "placement": 1,
+            "sub-sections": {
+                "ss-fail-bash": {
+                    "title": "Bash - Fail",
+                    "placement": 0,
+                    "scripts": [
+                        {
+                            "id": "s-fail-bash",
+                            "name": "Failing Bash",
+                            "type": "bash",
+                            "path": "scripts/bash/fail.sh",
+                            "placement": 0
+                        }
+                    ]
+                },
+                "ss-fail-ps": {
+                    "title": "PowerShell - Fail",
+                    "placement": 1,
+                    "scripts": [
+                        {
+                            "id": "s-fail-ps",
+                            "name": "Failing PowerShell",
+                            "type": "powershell",
+                            "path": "scripts/powershell/fail.ps1",
+                            "placement": 0
+                        }
+                    ]
+                },
+                "ss-fail-py": {
+                    "title": "Python - Fail",
+                    "placement": 2,
+                    "scripts": [
+                        {
+                            "id": "s-fail-py",
+                            "name": "Failing Python",
+                            "type": "python",
+                            "path": "scripts/python/fail.py",
+                            "placement": 0
+                        }
+                    ]
+                },
+                "ss-fail-cs": {
+                    "title": "C# - Fail",
+                    "placement": 3,
+                    "scripts": [
+                        {
+                            "id": "s-fail-cs",
+                            "name": "Failing C#",
+                            "type": "csharp",
+                            "path": "scripts/csharp/Fail",
+                            "placement": 0
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": "sec-env-vars",
+            "title": "3. Environment Variables",
+            "placement": 2,
+            "sub-sections": {
+                "ss-env-bash": {
+                    "title": "Bash - Read Env Var",
+                    "placement": 0,
+                    "scripts": [
+                        {
+                            "id": "s-env-bash",
+                            "name": "Read MY_VAR (Bash)",
+                            "type": "bash",
+                            "path": "scripts/bash/read-env.sh",
+                            "placement": 0,
+                            "env": {
+                                "MY_VAR": {
+                                    "type": "static",
+                                    "value": "hello_from_scriptflow"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ss-env-ps": {
+                    "title": "PowerShell - Read Env Var",
+                    "placement": 1,
+                    "scripts": [
+                        {
+                            "id": "s-env-ps",
+                            "name": "Read MY_VAR (PS)",
+                            "type": "powershell",
+                            "path": "scripts/powershell/read-env.ps1",
+                            "placement": 0,
+                            "env": {
+                                "MY_VAR": {
+                                    "type": "static",
+                                    "value": "hello_from_scriptflow"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ss-env-py": {
+                    "title": "Python - Read Env Var",
+                    "placement": 2,
+                    "scripts": [
+                        {
+                            "id": "s-env-py",
+                            "name": "Read MY_VAR (Python)",
+                            "type": "python",
+                            "path": "scripts/python/read-env.py",
+                            "placement": 0,
+                            "env": {
+                                "MY_VAR": {
+                                    "type": "static",
+                                    "value": "hello_from_scriptflow"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ss-env-cs": {
+                    "title": "C# - Read Env Var",
+                    "placement": 3,
+                    "scripts": [
+                        {
+                            "id": "s-env-cs",
+                            "name": "Read MY_VAR (C#)",
+                            "type": "csharp",
+                            "path": "scripts/csharp/ReadEnv",
+                            "placement": 0,
+                            "env": {
+                                "MY_VAR": {
+                                    "type": "static",
+                                    "value": "hello_from_scriptflow"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ss-env-multivalue": {
+                    "title": "Multi-Value Variable",
+                    "placement": 4,
+                    "scripts": [
+                        {
+                            "id": "s-env-multi",
+                            "name": "Multi-Value Env (Bash)",
+                            "type": "bash",
+                            "path": "scripts/bash/read-env.sh",
+                            "placement": 0,
+                            "env": {
+                                "MY_VAR": {
+                                    "type": "multi-value",
+                                    "display": "dropdown",
+                                    "values": ["dev", "staging", "production"],
+                                    "defaultValue": 0
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": "sec-conditions",
+            "title": "4. Conditions",
+            "placement": 3,
+            "sub-sections": {
+                "ss-cond-equals": {
+                    "title": "Condition: equals",
+                    "placement": 0,
+                    "scripts": [
+                        {
+                            "id": "s-cond-eq-a",
+                            "name": "Print SUCCESS",
+                            "type": "bash",
+                            "path": "scripts/bash/print-value.sh",
+                            "placement": 0,
+                            "successCondition": {
+                                "type": "equals",
+                                "value": "SUCCESS",
+                                "enabled": true
+                            }
+                        },
+                        {
+                            "id": "s-cond-eq-b",
+                            "name": "Should Run (equals passed)",
+                            "type": "bash",
+                            "path": "scripts/bash/basic.sh",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-cond-contains": {
+                    "title": "Condition: contains",
+                    "placement": 1,
+                    "scripts": [
+                        {
+                            "id": "s-cond-cont-a",
+                            "name": "Print SUCCESS",
+                            "type": "powershell",
+                            "path": "scripts/powershell/print-value.ps1",
+                            "placement": 0,
+                            "successCondition": {
+                                "type": "contains",
+                                "value": "SUCC",
+                                "enabled": true
+                            }
+                        },
+                        {
+                            "id": "s-cond-cont-b",
+                            "name": "Should Run (contains passed)",
+                            "type": "powershell",
+                            "path": "scripts/powershell/basic.ps1",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-cond-startswith": {
+                    "title": "Condition: startsWith",
+                    "placement": 2,
+                    "scripts": [
+                        {
+                            "id": "s-cond-sw-a",
+                            "name": "Print SUCCESS",
+                            "type": "python",
+                            "path": "scripts/python/print_value.py",
+                            "placement": 0,
+                            "successCondition": {
+                                "type": "startsWith",
+                                "value": "SUCC",
+                                "enabled": true
+                            }
+                        },
+                        {
+                            "id": "s-cond-sw-b",
+                            "name": "Should Run (startsWith passed)",
+                            "type": "python",
+                            "path": "scripts/python/basic.py",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-cond-endswith": {
+                    "title": "Condition: endsWith",
+                    "placement": 3,
+                    "scripts": [
+                        {
+                            "id": "s-cond-ew-a",
+                            "name": "Print COMPLETE",
+                            "type": "bash",
+                            "path": "scripts/bash/print-multiline.sh",
+                            "placement": 0,
+                            "successCondition": {
+                                "type": "endsWith",
+                                "value": "COMPLETE",
+                                "enabled": true
+                            }
+                        },
+                        {
+                            "id": "s-cond-ew-b",
+                            "name": "Should Run (endsWith passed)",
+                            "type": "bash",
+                            "path": "scripts/bash/basic.sh",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-cond-fail": {
+                    "title": "Condition Failure (expect RED)",
+                    "placement": 4,
+                    "scripts": [
+                        {
+                            "id": "s-cond-fail-a",
+                            "name": "Print SUCCESS",
+                            "type": "bash",
+                            "path": "scripts/bash/print-value.sh",
+                            "placement": 0,
+                            "successCondition": {
+                                "type": "equals",
+                                "value": "THIS_WILL_NOT_MATCH",
+                                "enabled": true
+                            }
+                        },
+                        {
+                            "id": "s-cond-fail-b",
+                            "name": "Should NOT Run",
+                            "type": "bash",
+                            "path": "scripts/bash/basic.sh",
+                            "placement": 1
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": "sec-output-pass",
+            "title": "5. Output Passing",
+            "placement": 4,
+            "sub-sections": {
+                "ss-opass-bash": {
+                    "title": "Bash - Output Pass",
+                    "placement": 0,
+                    "scripts": [
+                        {
+                            "id": "s-opass-bash-a",
+                            "name": "Producer (Bash)",
+                            "type": "bash",
+                            "path": "scripts/bash/print-value.sh",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-opass-bash-b",
+                            "name": "Consumer (Bash)",
+                            "type": "bash",
+                            "path": "scripts/bash/read-passed-output.sh",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-opass-ps": {
+                    "title": "PowerShell - Output Pass",
+                    "placement": 1,
+                    "scripts": [
+                        {
+                            "id": "s-opass-ps-a",
+                            "name": "Producer (PS)",
+                            "type": "powershell",
+                            "path": "scripts/powershell/print-value.ps1",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-opass-ps-b",
+                            "name": "Consumer (PS)",
+                            "type": "powershell",
+                            "path": "scripts/powershell/read-passed-output.ps1",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-opass-py": {
+                    "title": "Python - Output Pass",
+                    "placement": 2,
+                    "scripts": [
+                        {
+                            "id": "s-opass-py-a",
+                            "name": "Producer (Python)",
+                            "type": "python",
+                            "path": "scripts/python/print_value.py",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-opass-py-b",
+                            "name": "Consumer (Python)",
+                            "type": "python",
+                            "path": "scripts/python/read_passed_output.py",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-opass-cs": {
+                    "title": "C# - Output Pass",
+                    "placement": 3,
+                    "scripts": [
+                        {
+                            "id": "s-opass-cs-a",
+                            "name": "Producer (C#)",
+                            "type": "csharp",
+                            "path": "scripts/csharp/PrintValue",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-opass-cs-b",
+                            "name": "Consumer (C#)",
+                            "type": "csharp",
+                            "path": "scripts/csharp/ReadPassedOutput",
+                            "placement": 1
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": "sec-advanced",
+            "title": "6. Advanced",
+            "placement": 5,
+            "sub-sections": {
+                "ss-stdout-only": {
+                    "title": "Stdout Only (stdoutOnly=true)",
+                    "placement": 0,
+                    "scripts": [
+                        {
+                            "id": "s-stdout-a",
+                            "name": "Stdout + Stderr Producer",
+                            "type": "bash",
+                            "path": "scripts/bash/stdout-and-stderr.sh",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT",
+                                "stdoutOnly": true
+                            }
+                        },
+                        {
+                            "id": "s-stdout-b",
+                            "name": "Consumer (check no stderr)",
+                            "type": "bash",
+                            "path": "scripts/bash/read-passed-output.sh",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-stdout-full": {
+                    "title": "Full Output (stdout+stderr)",
+                    "placement": 1,
+                    "scripts": [
+                        {
+                            "id": "s-full-a",
+                            "name": "Stdout + Stderr Producer",
+                            "type": "bash",
+                            "path": "scripts/bash/stdout-and-stderr.sh",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT",
+                                "stdoutOnly": false
+                            }
+                        },
+                        {
+                            "id": "s-full-b",
+                            "name": "Consumer (has stderr too)",
+                            "type": "bash",
+                            "path": "scripts/bash/read-passed-output.sh",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-multiline-cond": {
+                    "title": "Multi-line + Last-Line Condition",
+                    "placement": 2,
+                    "scripts": [
+                        {
+                            "id": "s-ml-a",
+                            "name": "Multi-line Output",
+                            "type": "bash",
+                            "path": "scripts/bash/print-multiline.sh",
+                            "placement": 0,
+                            "successCondition": {
+                                "type": "equals",
+                                "value": "COMPLETE",
+                                "enabled": true
+                            }
+                        },
+                        {
+                            "id": "s-ml-b",
+                            "name": "Should Run (last line matched)",
+                            "type": "bash",
+                            "path": "scripts/bash/basic.sh",
+                            "placement": 1
+                        }
+                    ]
+                },
+                "ss-chain-3": {
+                    "title": "3-Script Chain (A→B→C)",
+                    "placement": 3,
+                    "scripts": [
+                        {
+                            "id": "s-chain-a",
+                            "name": "Chain A: Producer",
+                            "type": "bash",
+                            "path": "scripts/bash/print-value.sh",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-chain-b",
+                            "name": "Chain B: Transform",
+                            "type": "bash",
+                            "path": "scripts/bash/chain-middle.sh",
+                            "placement": 1,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-chain-c",
+                            "name": "Chain C: Final Consumer",
+                            "type": "bash",
+                            "path": "scripts/bash/read-passed-output.sh",
+                            "placement": 2
+                        }
+                    ]
+                },
+                "ss-cross-lang": {
+                    "title": "Cross-Language Chain (Bash→Python→PS)",
+                    "placement": 4,
+                    "scripts": [
+                        {
+                            "id": "s-cross-a",
+                            "name": "Bash Producer",
+                            "type": "bash",
+                            "path": "scripts/bash/print-value.sh",
+                            "placement": 0,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-cross-b",
+                            "name": "Python Consumer+Producer",
+                            "type": "python",
+                            "path": "scripts/python/chain_middle.py",
+                            "placement": 1,
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-cross-c",
+                            "name": "PowerShell Final Consumer",
+                            "type": "powershell",
+                            "path": "scripts/powershell/read-passed-output.ps1",
+                            "placement": 2
+                        }
+                    ]
+                },
+                "ss-cond-plus-pass": {
+                    "title": "Condition + Output Pass Combined",
+                    "placement": 5,
+                    "scripts": [
+                        {
+                            "id": "s-cp-a",
+                            "name": "Producer with Condition",
+                            "type": "bash",
+                            "path": "scripts/bash/print-value.sh",
+                            "placement": 0,
+                            "successCondition": {
+                                "type": "contains",
+                                "value": "SUCCESS",
+                                "enabled": true
+                            },
+                            "outputPass": {
+                                "enabled": true,
+                                "envVarName": "SCRIPT_OUTPUT"
+                            }
+                        },
+                        {
+                            "id": "s-cp-b",
+                            "name": "Consumer (condition passed + got output)",
+                            "type": "bash",
+                            "path": "scripts/bash/read-passed-output.sh",
+                            "placement": 1
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

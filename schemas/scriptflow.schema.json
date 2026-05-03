@@ -1,0 +1,222 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Scriptflow Config",
+    "type": "object",
+    "required": [
+        "version",
+        "sections"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "format": "uri"
+        },
+        "version": {
+            "type": "string"
+        },
+        "sections": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/Section"
+            }
+        }
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "ConditionConfig": {
+            "type": "object",
+            "required": [
+                "type",
+                "value",
+                "enabled"
+            ],
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "contains",
+                        "equals",
+                        "startsWith",
+                        "endsWith"
+                    ]
+                },
+                "value": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "setEnvVar": {
+                    "type": "boolean"
+                },
+                "envVarName": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false
+        },
+        "EnvValue": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/StaticEnvValue"
+                },
+                {
+                    "$ref": "#/$defs/MultiValueEnvVariable"
+                }
+            ]
+        },
+        "StaticEnvValue": {
+            "type": "object",
+            "required": [
+                "type",
+                "value"
+            ],
+            "properties": {
+                "type": {
+                    "const": "static"
+                },
+                "value": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false
+        },
+        "MultiValueEnvVariable": {
+            "type": "object",
+            "required": [
+                "type",
+                "display",
+                "values",
+                "defaultValue"
+            ],
+            "properties": {
+                "type": {
+                    "const": "multi-value"
+                },
+                "display": {
+                    "type": "string",
+                    "enum": [
+                        "dropdown",
+                        "radio"
+                    ]
+                },
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 2
+                },
+                "defaultValue": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "additionalProperties": false
+        },
+        "ScriptEntry": {
+            "type": "object",
+            "required": [
+                "id",
+                "type",
+                "path",
+                "placement"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "bash",
+                        "csharp",
+                        "python",
+                        "powershell",
+                        "custom"
+                    ]
+                },
+                "path": {
+                    "type": "string"
+                },
+                "customCommand": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/EnvValue"
+                    }
+                },
+                "secrets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "successCondition": {
+                    "$ref": "#/$defs/ConditionConfig"
+                },
+                "placement": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "additionalProperties": false
+        },
+        "SubSection": {
+            "type": "object",
+            "required": [
+                "title",
+                "placement"
+            ],
+            "properties": {
+                "title": {
+                    "type": "string"
+                },
+                "placement": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "scripts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/ScriptEntry"
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "Section": {
+            "type": "object",
+            "required": [
+                "id",
+                "title",
+                "sub-sections",
+                "placement"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "sub-sections": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/SubSection"
+                    }
+                },
+                "placement": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

@@ -1,0 +1,60 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Scriptflow Vault Configuration",
+    "type": "object",
+    "description": "Configuration file for managing multiple Scriptflow vaults",
+    "required": [
+        "activeVaultId",
+        "vaults"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "format": "uri",
+            "description": "Reference to this JSON schema"
+        },
+        "activeVaultId": {
+            "type": ["string", "null"],
+            "description": "ID of the currently active vault, or null if no vault is active"
+        },
+        "vaults": {
+            "type": "array",
+            "description": "List of configured vaults",
+            "items": {
+                "$ref": "#/$defs/VaultMetadata"
+            }
+        }
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "VaultMetadata": {
+            "type": "object",
+            "required": [
+                "id",
+                "name",
+                "path",
+                "exists"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Unique identifier for this vault (UUID)"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Display name of the vault"
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Absolute filesystem path to the vault directory"
+                },
+                "exists": {
+                    "type": "boolean",
+                    "description": "Whether the vault directory currently exists on the filesystem"
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

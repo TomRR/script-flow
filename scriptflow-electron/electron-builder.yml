@@ -1,0 +1,28 @@
+appId: com.tomrr.scriptflow
+productName: ScriptFlow
+artifactName: ${productName}-${env.BUILD_IDENTIFIER}.${ext}
+directories:
+  output: dist
+  buildResources: build
+icon: public/icon.png
+files:
+  - dist-electron/**/*
+  - dist/**/*
+  - '!**/*.{ts,tsx,map}'
+mac:
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  identity: null # Skip signing for local dev
+win:
+  target: nsis
+linux:
+  target: AppImage
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
