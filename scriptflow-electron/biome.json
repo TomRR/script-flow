@@ -31,6 +31,8 @@
             "!**/dist/**",
             "!**/dist-electron/**",
             "!**/build/**",
+            "!**/bin/**",
+            "!**/obj/**",
             "!**/node_modules/**",
             "!**/*.config.js",
             "!**/*.config.cjs",

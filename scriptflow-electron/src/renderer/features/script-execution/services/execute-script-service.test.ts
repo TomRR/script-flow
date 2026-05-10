@@ -1,4 +1,5 @@
 import { ScriptEntry, VaultHandler } from '../../../../main/vault-handler'
+import { BashRuntimeService } from '../../../../main/bash-runtime-service'
 import { MultiVaultService } from '../../../../main/multi-vault-service'
 import { SecretsHandler } from '../../../../main/secrets-handler'
 import { ExecuteScriptService } from './execute-script-service'
@@ -15,6 +16,7 @@ describe('ExecuteScriptService', () => {
     let mockVaultHandler: jest.Mocked<VaultHandler>
     let mockMultiVaultService: jest.Mocked<MultiVaultService>
     let mockSecretsHandler: jest.Mocked<SecretsHandler>
+    let mockBashRuntimeService: jest.Mocked<Pick<BashRuntimeService, 'getPlatform' | 'resolveCommand'>>
 
     beforeEach(() => {
         // Create mock services
@@ -39,7 +41,17 @@ describe('ExecuteScriptService', () => {
             }),
         } as unknown as jest.Mocked<SecretsHandler>
 
-        service = new ExecuteScriptService(mockVaultHandler, mockMultiVaultService, mockSecretsHandler)
+        mockBashRuntimeService = {
+            getPlatform: jest.fn().mockReturnValue('linux'),
+            resolveCommand: jest.fn().mockResolvedValue('bash'),
+        }
+
+        service = new ExecuteScriptService(
+            mockVaultHandler,
+            mockMultiVaultService,
+            mockSecretsHandler,
+            mockBashRuntimeService,
+        )
         jest.clearAllMocks()
 
         // Default mock implementation
@@ -61,6 +73,7 @@ describe('ExecuteScriptService', () => {
 
         await service.runSingleScript(script)
 
+        expect(mockBashRuntimeService.resolveCommand).toHaveBeenCalled()
         expect(execa).toHaveBeenCalledWith(
             'bash',
             ['/resolved/path/to/script'],
@@ -80,6 +93,7 @@ describe('ExecuteScriptService', () => {
 
         await service.runSingleScript(script)
 
+        expect(mockBashRuntimeService.resolveCommand).not.toHaveBeenCalled()
         expect(execa).toHaveBeenCalledWith(
             'python3',
             ['-u', '/resolved/path/to/script'],
@@ -213,6 +227,50 @@ describe('ExecuteScriptService', () => {
 
         expect(outputChunks).toContain('line1\n')
         expect(outputChunks).toContain('line2')
+    })
+
+    it('should translate Windows bash script paths for Git Bash', async () => {
+        const script: ScriptEntry = {
+            id: '7a',
+            type: 'bash',
+            path: '/scripts/windows-path.sh',
+            placement: 0,
+        }
+
+        mockBashRuntimeService.getPlatform.mockReturnValue('win32')
+        mockBashRuntimeService.resolveCommand.mockResolvedValue('C:\\Program Files\\Git\\bin\\bash.exe')
+        mockVaultHandler.resolveScriptPath.mockResolvedValueOnce('C:\\dev\\ScriptVault\\MR\\mr.sh')
+
+        await service.runSingleScript(script)
+
+        expect(execa).toHaveBeenCalledWith(
+            'C:\\Program Files\\Git\\bin\\bash.exe',
+            ['/c/dev/ScriptVault/MR/mr.sh'],
+            expect.objectContaining({
+                env: expect.any(Object),
+            }),
+        )
+    })
+
+    it('should return a helpful error when Git Bash is unavailable on Windows', async () => {
+        const script: ScriptEntry = {
+            id: '7b',
+            type: 'bash',
+            path: '/scripts/missing-bash.sh',
+            placement: 0,
+        }
+
+        mockBashRuntimeService.getPlatform.mockReturnValue('win32')
+        mockBashRuntimeService.resolveCommand.mockRejectedValue(
+            new Error(
+                'Git Bash not found. Install Git for Windows and ensure bash.exe is available on PATH or in a standard Git installation folder',
+            ),
+        )
+
+        const result = await service.runSingleScript(script)
+
+        expect(result.success).toBe(false)
+        expect(execa).not.toHaveBeenCalled()
     })
 
     it('should stop a running script', async () => {

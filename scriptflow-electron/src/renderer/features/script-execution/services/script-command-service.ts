@@ -5,6 +5,11 @@ export interface ScriptCommand {
     args: string[]
 }
 
+export interface ScriptCommandBuildOptions {
+    bashCommand?: string
+    platform?: NodeJS.Platform
+}
+
 function getExtension(filePath: string): string {
     const lastSlashIndex = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
     const fileName = lastSlashIndex === -1 ? filePath : filePath.substring(lastSlashIndex + 1)
@@ -19,10 +24,11 @@ export class ScriptCommandService {
     static buildCommand(
         script: Pick<ScriptEntry, 'type' | 'customCommand'>,
         absoluteScriptPath: string,
+        options: ScriptCommandBuildOptions = {},
     ): ScriptCommand {
         switch (script.type) {
             case 'bash':
-                return { command: 'bash', args: [absoluteScriptPath] }
+                return this.buildBashCommand(absoluteScriptPath, options)
             case 'python':
                 return { command: 'python3', args: ['-u', absoluteScriptPath] }
             case 'csharp':
@@ -33,6 +39,13 @@ export class ScriptCommandService {
                 return this.buildCustomCommand(script.customCommand, absoluteScriptPath)
             default:
                 throw new Error(`Unsupported script type: ${script.type}`)
+        }
+    }
+
+    private static buildBashCommand(absoluteScriptPath: string, options: ScriptCommandBuildOptions): ScriptCommand {
+        return {
+            command: options.bashCommand ?? 'bash',
+            args: [this.normalizeBashScriptPath(absoluteScriptPath, options.platform ?? process.platform)],
         }
     }
 
@@ -56,5 +69,19 @@ export class ScriptCommandService {
         const args = commandParts.slice(1).concat([absoluteScriptPath])
 
         return { command, args }
+    }
+
+    private static normalizeBashScriptPath(filePath: string, platform: NodeJS.Platform): string {
+        if (platform !== 'win32') {
+            return filePath
+        }
+
+        const driveLetterMatch = filePath.match(/^([A-Za-z]):[\\/](.*)$/)
+        if (!driveLetterMatch) {
+            return filePath
+        }
+
+        const [, driveLetter, rest] = driveLetterMatch
+        return `/${driveLetter.toLowerCase()}/${rest.replace(/\\/g, '/')}`
     }
 }

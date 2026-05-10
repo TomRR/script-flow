@@ -12,6 +12,7 @@ import { ExternalLinkService } from './external-link-service'
 import { ExternalLinkIpcService } from './external-link-ipc-service'
 import { AppUpdateService } from './app-update-service'
 import { AppUpdateIpcService } from './app-update-ipc-service'
+import { BashRuntimeService } from './bash-runtime-service'
 import { ExecuteScriptService } from '../renderer/features/script-execution/services/execute-script-service'
 import { LogService } from './log-service'
 
@@ -89,9 +90,15 @@ app.whenReady().then(() => {
 
     // Add IPC handlers here
     const vaultHandler = new VaultHandler(multiVaultService)
+    const bashRuntimeService = new BashRuntimeService()
     // Dynamic import to avoid issues if the file isn't transpiled yet, but standard import is better if setup allows.
     // Assuming standard import works as per existing patterns.
-    const executeScriptService = new ExecuteScriptService(vaultHandler, multiVaultService, secretsHandler)
+    const executeScriptService = new ExecuteScriptService(
+        vaultHandler,
+        multiVaultService,
+        secretsHandler,
+        bashRuntimeService,
+    )
 
     ipcMain.handle('vault:check', () => vaultHandler.checkVaultConfig())
     ipcMain.handle('app:getInfo', () => appInfoService.getInfo())

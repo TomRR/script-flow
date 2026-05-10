@@ -1,4 +1,5 @@
 import { execa } from 'execa'
+import { BashRuntimeService } from '../../../../main/bash-runtime-service'
 import type { ScriptEntry, VaultHandler, ConditionConfig } from '../../../../main/vault-handler'
 import type { MultiVaultService } from '../../../../main/multi-vault-service'
 import type { SecretsHandler } from '../../../../main/secrets-handler'
@@ -49,14 +50,21 @@ export class ExecuteScriptService {
     private vaultHandler: VaultHandler
     private multiVaultService: MultiVaultService
     private secretsHandler: SecretsHandler
+    private bashRuntimeService: Pick<BashRuntimeService, 'getPlatform' | 'resolveCommand'>
     private runningScripts: Map<string, any> = new Map()
     private dynamicEnvVars: Record<string, string> = {}
     private currentlyRunningWorkflowScriptId: string | null = null
 
-    constructor(vaultHandler: VaultHandler, multiVaultService: MultiVaultService, secretsHandler: SecretsHandler) {
+    constructor(
+        vaultHandler: VaultHandler,
+        multiVaultService: MultiVaultService,
+        secretsHandler: SecretsHandler,
+        bashRuntimeService: Pick<BashRuntimeService, 'getPlatform' | 'resolveCommand'> = new BashRuntimeService(),
+    ) {
         this.vaultHandler = vaultHandler
         this.multiVaultService = multiVaultService
         this.secretsHandler = secretsHandler
+        this.bashRuntimeService = bashRuntimeService
     }
 
     /**
@@ -98,7 +106,11 @@ export class ExecuteScriptService {
         let capturedStdout = ''
 
         try {
-            const { command, args } = ScriptCommandService.buildCommand(script, absoluteScriptPath)
+            const bashCommand = script.type === 'bash' ? await this.bashRuntimeService.resolveCommand() : undefined
+            const { command, args } = ScriptCommandService.buildCommand(script, absoluteScriptPath, {
+                bashCommand,
+                platform: this.bashRuntimeService.getPlatform(),
+            })
             subprocess = execa(command, args, { env })
 
             this.runningScripts.set(script.id, subprocess)
