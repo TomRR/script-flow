@@ -4,35 +4,12 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { AppIconService } from '../src/main/app-icon-service'
-
-export type BuildPlatform = 'mac' | 'linux' | 'win'
-export type BuildArch = 'arm64' | 'x64'
-
-export interface BuildDesktopArtifactOptions {
-    platform: BuildPlatform
-    target: string
-    arch: BuildArch
-    buildVersion?: string
-    outputDir: string
-    skipBuild: boolean
-}
-
-interface GitHubPublishConfig {
-    provider: 'github'
-    owner: string
-    repo: string
-    releaseType: 'release' | 'prerelease'
-}
-
-interface AzureSignOptions {
-    publisherName: string
-    endpoint: string
-    certificateProfileName: string
-    codeSigningAccountName: string
-    fileDigest: 'SHA256'
-    timestampDigest: 'SHA256'
-    timestampRfc3161: 'http://timestamp.acs.microsoft.com'
-}
+import {
+    DesktopBuilderConfigService,
+    type BuildArch,
+    type BuildDesktopArtifactOptions,
+    type BuildPlatform,
+} from './desktop-builder-config-service'
 
 function assert(condition: boolean, message: string): asserts condition {
     if (!condition) {
@@ -47,10 +24,6 @@ function getProjectRoot(): string {
 function getPackageVersion(projectRoot: string): string {
     const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
     return packageJson.version
-}
-
-function hasAll(values: Array<string | undefined>): values is string[] {
-    return values.every((value) => typeof value === 'string' && value.trim().length > 0)
 }
 
 function resolveHostPlatform(platformValue: NodeJS.Platform): BuildPlatform {
@@ -139,70 +112,6 @@ export function parseBuildDesktopArtifactArgs(
     return options
 }
 
-export function resolveGitHubPublishConfig(version: string): GitHubPublishConfig | undefined {
-    const rawRepository =
-        process.env.SCRIPTFLOW_DESKTOP_UPDATE_REPOSITORY?.trim() || process.env.GITHUB_REPOSITORY?.trim() || ''
-    if (!rawRepository) {
-        return undefined
-    }
-
-    const [owner, repo, ...rest] = rawRepository.split('/')
-    if (!owner || !repo || rest.length > 0) {
-        return undefined
-    }
-
-    return {
-        provider: 'github',
-        owner,
-        repo,
-        releaseType: version.includes('-') ? 'prerelease' : 'release',
-    }
-}
-
-export function hasMacSigningSecrets(environment: NodeJS.ProcessEnv = process.env): boolean {
-    return hasAll([
-        environment.CSC_LINK,
-        environment.CSC_KEY_PASSWORD,
-        environment.APPLE_API_KEY,
-        environment.APPLE_API_KEY_ID,
-        environment.APPLE_API_ISSUER,
-    ])
-}
-
-export function hasWindowsSigningSecrets(environment: NodeJS.ProcessEnv = process.env): boolean {
-    return hasAll([
-        environment.AZURE_TENANT_ID,
-        environment.AZURE_CLIENT_ID,
-        environment.AZURE_CLIENT_SECRET,
-        environment.AZURE_TRUSTED_SIGNING_ENDPOINT,
-        environment.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME,
-        environment.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME,
-        environment.AZURE_TRUSTED_SIGNING_PUBLISHER_NAME,
-    ])
-}
-
-export function resolveWindowsSigningConfig(
-    environment: NodeJS.ProcessEnv = process.env,
-): AzureSignOptions | undefined {
-    if (!hasWindowsSigningSecrets(environment)) {
-        return undefined
-    }
-
-    return {
-        publisherName: environment.AZURE_TRUSTED_SIGNING_PUBLISHER_NAME!,
-        endpoint: environment.AZURE_TRUSTED_SIGNING_ENDPOINT!,
-        certificateProfileName: environment.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME!,
-        codeSigningAccountName: environment.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME!,
-        fileDigest: 'SHA256',
-        timestampDigest: 'SHA256',
-        timestampRfc3161: 'http://timestamp.acs.microsoft.com',
-    }
-}
-
-export function createArtifactNamePattern(platformValue: BuildPlatform): string {
-    return `ScriptFlow-\${version}-${platformValue}-\${arch}.\${ext}`
-}
-
 async function runCommand(
     command: string,
     args: string[],
@@ -229,60 +138,6 @@ async function runCommand(
     })
 }
 
-function writeBuilderConfig(options: BuildDesktopArtifactOptions, environment: NodeJS.ProcessEnv): string {
-    const publishConfig = resolveGitHubPublishConfig(options.buildVersion!)
-    const builderConfig: Record<string, unknown> = {
-        appId: 'com.tomrr.scriptflow',
-        productName: 'ScriptFlow',
-        artifactName: createArtifactNamePattern(options.platform),
-        directories: {
-            output: options.outputDir,
-            buildResources: 'build',
-        },
-        icon: 'public/icon.png',
-        files: ['dist-electron/**/*', 'dist/**/*', '!**/*.{ts,tsx,map}'],
-        extraMetadata: {
-            version: options.buildVersion,
-        },
-        nsis: {
-            oneClick: false,
-            allowToChangeInstallationDirectory: true,
-        },
-    }
-
-    if (publishConfig) {
-        builderConfig.publish = [publishConfig]
-    }
-
-    if (options.platform === 'mac') {
-        builderConfig.mac = {
-            icon: 'build/icon.icns',
-            category: 'public.app-category.developer-tools',
-            target: options.target === 'dmg' ? ['dmg', 'zip'] : [options.target],
-            ...(hasMacSigningSecrets(environment) ? {} : { identity: null }),
-        }
-    }
-
-    if (options.platform === 'linux') {
-        builderConfig.linux = {
-            target: [options.target],
-            category: 'Development',
-        }
-    }
-
-    if (options.platform === 'win') {
-        const azureSignOptions = resolveWindowsSigningConfig(environment)
-        builderConfig.win = {
-            target: [options.target],
-            ...(azureSignOptions ? { azureSignOptions } : { signAndEditExecutable: false }),
-        }
-    }
-
-    const configPath = path.join(tmpdir(), `scriptflow-builder-${options.platform}-${options.arch}-${Date.now()}.json`)
-    writeFileSync(configPath, JSON.stringify(builderConfig, null, 4), 'utf8')
-    return configPath
-}
-
 function renameUpdaterManifests(outputDir: string, platformValue: BuildPlatform, arch: BuildArch): void {
     if (platformValue === 'mac' && arch !== 'arm64') {
         for (const file of readdirSync(outputDir)) {
@@ -303,7 +158,7 @@ export async function buildDesktopArtifact(options: BuildDesktopArtifactOptions)
     const projectRoot = getProjectRoot()
     const environment: NodeJS.ProcessEnv = { ...process.env }
     const outputDir = path.resolve(options.outputDir)
-    const builderConfigPath = writeBuilderConfig(options, environment)
+    const builderConfigPath = DesktopBuilderConfigService.writeBuilderConfig(options, environment)
     const builderArgs = ['electron-builder', '--publish', 'never', '--config', builderConfigPath]
 
     mkdirSync(outputDir, { recursive: true })
@@ -312,11 +167,15 @@ export async function buildDesktopArtifact(options: BuildDesktopArtifactOptions)
         await AppIconService.ensureMacIconAssets({ projectRoot })
     }
 
+    if (options.platform === 'win') {
+        await AppIconService.ensureWindowsIconAssets({ projectRoot })
+    }
+
     if (!options.skipBuild) {
         await runCommand('bun', ['run', 'build:desktop'], projectRoot, environment)
     }
 
-    if (!hasMacSigningSecrets(environment)) {
+    if (!DesktopBuilderConfigService.hasMacSigningSecrets(environment)) {
         environment.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
         delete environment.CSC_LINK
         delete environment.CSC_KEY_PASSWORD

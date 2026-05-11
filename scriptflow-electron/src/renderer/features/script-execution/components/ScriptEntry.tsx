@@ -2,7 +2,20 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import type { ScriptEntry, ExecutionStatus } from '../../../../renderer.d'
 import { ScriptEntryStatusService } from '../services/script-entry-status-service'
-import { FolderOpen, Trash2, Play, MoreVertical, X, Plus, Lock, Pencil, Copy, Settings, FileEdit } from 'lucide-react'
+import {
+    FolderOpen,
+    Trash2,
+    Play,
+    MoreVertical,
+    X,
+    Plus,
+    Lock,
+    Pencil,
+    Copy,
+    Settings,
+    FileEdit,
+    Eraser,
+} from 'lucide-react'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
@@ -31,6 +44,7 @@ import { MultiValueVariableService } from '../services/multi-value-variable-serv
 import { MultiValueDropdown } from './MultiValueDropdown'
 import { MultiValueRadio } from './MultiValueRadio'
 import { MultiValueVariableDialog } from './MultiValueVariableDialog'
+import { useScriptOutput } from '../hooks/use-script-output'
 import type { MultiValueEnvVariable, EnvValue } from '../../../../renderer.d'
 
 interface ScriptEntryProps {
@@ -58,7 +72,7 @@ export function ScriptEntryComponent({
     dragHandle,
 }: ScriptEntryProps) {
     const [isRunning, setIsRunning] = useState(false)
-    const [output, setOutput] = useState<string>('')
+    const { output, appendOutput, clearOutput } = useScriptOutput()
     const [open, setOpen] = useState(false)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [editFormState, setEditFormState] = useState<EditFormState>(EnvSecretEditorService.createInitialState())
@@ -106,14 +120,14 @@ export function ScriptEntryComponent({
         // Listen for output
         const removeListener = window.api.script.onOutput((data) => {
             if (data.scriptId === script.id) {
-                setOutput((prev) => prev + data.data)
+                appendOutput(data.data)
             }
         })
 
         return () => {
             removeListener()
         }
-    }, [script.id])
+    }, [appendOutput, script.id])
 
     const handleTypeChange = (value: string) => {
         onUpdate({
@@ -273,7 +287,7 @@ export function ScriptEntryComponent({
 
     const handleRunClick = async () => {
         setIsRunning(true)
-        setOutput('') // Clear previous output
+        clearOutput()
         try {
             await onRun(script)
         } finally {
@@ -408,6 +422,8 @@ export function ScriptEntryComponent({
         const result = await ScriptFileEditorService.saveFile(scriptEditorState)
         setScriptEditorState(result)
     }
+
+    const shouldShowOutput = isRunning || executionStatus === 'running' || output.length > 0
 
     return (
         <div
@@ -902,9 +918,19 @@ export function ScriptEntryComponent({
             </div>
 
             {/* Output Display */}
-            {output && (
-                <div className="mt-2 p-2 bg-black text-white font-mono text-xs rounded h-32 overflow-y-auto whitespace-pre-wrap">
-                    {output}
+            {shouldShowOutput && (
+                <div className="mt-2 relative bg-black text-white font-mono text-xs rounded h-32 overflow-hidden border border-border">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={clearOutput}
+                        title="Clear output"
+                        aria-label="Clear output"
+                        className="absolute right-1 top-1 h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"
+                    >
+                        <Eraser className="h-3.5 w-3.5" />
+                    </Button>
+                    <div className="h-full overflow-y-auto whitespace-pre-wrap p-2 pr-10">{output}</div>
                 </div>
             )}
 

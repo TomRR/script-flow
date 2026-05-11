@@ -20,9 +20,12 @@ mac:
         - arm64
   identity: null # Skip signing for local dev
 win:
+  icon: build/icon.ico
   target: nsis
 linux:
   target: AppImage
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico

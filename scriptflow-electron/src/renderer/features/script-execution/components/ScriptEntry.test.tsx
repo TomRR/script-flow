@@ -843,6 +843,168 @@ describe('ScriptEntryComponent - Drag Handle Integration', () => {
     })
 })
 
+describe('ScriptEntryComponent - Output Clearing', () => {
+    const mockOnUpdate = jest.fn()
+    const mockOnRemove = jest.fn()
+    const mockOnRun = jest.fn()
+    const outputListeners: Array<(data: { scriptId: string; data: string }) => void> = []
+
+    const emitOutput = (scriptId: string, data: string) => {
+        outputListeners.forEach((listener) => listener({ scriptId, data }))
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks()
+        outputListeners.length = 0
+        const { SecretsService } = require('../../secrets/services/secrets-service')
+        SecretsService.getSecrets = jest.fn().mockResolvedValue({
+            version: '1.0',
+            secrets: {},
+        })
+        ;(global as any).window.api = {
+            script: {
+                onOutput: jest.fn((callback: (data: { scriptId: string; data: string }) => void) => {
+                    outputListeners.push(callback)
+                    return jest.fn()
+                }),
+                stopScript: jest.fn(),
+            },
+            dialog: {
+                openScript: jest.fn(),
+            },
+        }
+    })
+
+    it('should clear the visible output for the current script entry', async () => {
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={mockScript}
+                scripts={[mockScript]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            emitOutput(mockScript.id, 'first message')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText('first message')).toBeInTheDocument()
+        })
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /clear output/i }))
+        })
+
+        await waitFor(() => {
+            expect(screen.queryByText('first message')).not.toBeInTheDocument()
+        })
+    })
+
+    it('should keep other script entry output when one entry is cleared', async () => {
+        await renderWithAct(
+            <>
+                <ScriptEntryComponent
+                    script={mockScript}
+                    scripts={[mockScript, mockOtherScript]}
+                    onUpdate={mockOnUpdate}
+                    onRemove={mockOnRemove}
+                    onRun={mockOnRun}
+                />
+                <ScriptEntryComponent
+                    script={mockOtherScript}
+                    scripts={[mockScript, mockOtherScript]}
+                    onUpdate={mockOnUpdate}
+                    onRemove={mockOnRemove}
+                    onRun={mockOnRun}
+                />
+            </>,
+        )
+
+        await act(async () => {
+            emitOutput(mockScript.id, 'first script output')
+            emitOutput(mockOtherScript.id, 'second script output')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText('first script output')).toBeInTheDocument()
+            expect(screen.getByText('second script output')).toBeInTheDocument()
+        })
+
+        const clearButtons = screen.getAllByRole('button', { name: /clear output/i })
+        await act(async () => {
+            fireEvent.click(clearButtons[0])
+        })
+
+        await waitFor(() => {
+            expect(screen.queryByText('first script output')).not.toBeInTheDocument()
+            expect(screen.getByText('second script output')).toBeInTheDocument()
+        })
+    })
+
+    it('should append new output after clearing', async () => {
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={mockScript}
+                scripts={[mockScript]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            emitOutput(mockScript.id, 'old message')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText('old message')).toBeInTheDocument()
+        })
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /clear output/i }))
+            emitOutput(mockScript.id, 'new message')
+        })
+
+        await waitFor(() => {
+            expect(screen.queryByText('old message')).not.toBeInTheDocument()
+            expect(screen.getByText('new message')).toBeInTheDocument()
+        })
+    })
+
+    it('should keep the output panel visible after clearing while the script is running', async () => {
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={mockScript}
+                scripts={[mockScript]}
+                executionStatus="running"
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            emitOutput(mockScript.id, 'running message')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText('running message')).toBeInTheDocument()
+        })
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /clear output/i }))
+        })
+
+        await waitFor(() => {
+            expect(screen.queryByText('running message')).not.toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /clear output/i })).toBeInTheDocument()
+        })
+    })
+})
+
 describe('ScriptEntryComponent - Delete Variable/Secret Confirmation', () => {
     const mockOnUpdate = jest.fn()
     const mockOnRemove = jest.fn()

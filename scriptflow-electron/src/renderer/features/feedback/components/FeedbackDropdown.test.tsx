@@ -8,6 +8,7 @@ const mockOpen = jest.fn()
 
 jest.mock('../FeedbackContext', () => ({
     useFeedback: () => ({
+        version: '1.2.3',
         discovery: {
             config: {
                 docs: 'https://docs.example.com',
@@ -54,5 +55,11 @@ describe('FeedbackDropdown', () => {
 
         expect(mockOpen).toHaveBeenCalledWith('https://tally.so/r/68kdGJ')
         expect(onClose).toHaveBeenCalled()
+    })
+
+    test('shows the current version as a release tag in the rating section', () => {
+        render(<FeedbackDropdown isOpen={true} onClose={jest.fn()} onRatingSelect={jest.fn()} />)
+
+        expect(screen.getByText('Version v1.2.3')).toBeInTheDocument()
     })
 })

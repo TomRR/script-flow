@@ -5,7 +5,7 @@ const WINDOWS_BASH_FILENAME = 'bash.exe'
 const WINDOWS_PATH_DELIMITER = ';'
 const WINDOWS_GIT_BASH_SUBPATHS = [
     ['Git', 'bin', WINDOWS_BASH_FILENAME],
-    ['Git', 'usr', 'bin', WINDOWS_BASH_FILENAME],
+    ['Git', 'usr', 'bin', WINDOWS_BASH_FILENAME]
 ]
 
 interface BashRuntimeServiceOptions {
@@ -36,27 +36,32 @@ export class BashRuntimeService {
             return 'bash'
         }
 
-        const commandFromPath = await this.findCommandOnPath()
-        if (commandFromPath) {
-            return commandFromPath
-        }
-
         const commandFromCommonInstall = await this.findCommandInCommonInstallLocations()
         if (commandFromCommonInstall) {
             return commandFromCommonInstall
         }
 
-        throw new Error(
-            'Git Bash not found. Install Git for Windows and ensure bash.exe is available on PATH or in a standard Git installation folder',
-        )
+        const rejectedPathCommands: string[] = []
+        const commandFromPath = await this.findCommandOnPath(rejectedPathCommands)
+        if (commandFromPath) {
+            return commandFromPath
+        }
+
+        throw new Error(this.createGitBashNotFoundMessage(rejectedPathCommands))
     }
 
-    private async findCommandOnPath(): Promise<string | null> {
+    private async findCommandOnPath(rejectedPathCommands: string[]): Promise<string | null> {
         for (const pathEntry of this.getPathEntries()) {
             const candidate = this.pathModule.join(pathEntry, WINDOWS_BASH_FILENAME)
-            if (await this.fileExistsValue(candidate)) {
+            if (!(await this.fileExistsValue(candidate))) {
+                continue
+            }
+
+            if (BashRuntimeService.isGitForWindowsBashPath(candidate)) {
                 return candidate
             }
+
+            rejectedPathCommands.push(candidate)
         }
 
         return null
@@ -93,12 +98,32 @@ export class BashRuntimeService {
         ].filter((root): root is string => Boolean(root))
 
         return installRoots.flatMap((root) =>
-            WINDOWS_GIT_BASH_SUBPATHS.map((segments) => this.pathModule.join(root, ...segments)),
+            WINDOWS_GIT_BASH_SUBPATHS.map((segments) => this.pathModule.join(root, ...segments))
         )
+    }
+
+    private createGitBashNotFoundMessage(rejectedPathCommands: string[]): string {
+        const baseMessage =
+            'Git Bash not found. Install Git for Windows or put Git Bash ahead of incompatible bash.exe entries on PATH'
+
+        if (rejectedPathCommands.length === 0) {
+            return baseMessage
+        }
+
+        return `${baseMessage}. Rejected non-Git Bash candidates found on PATH: ${rejectedPathCommands.join(', ')}`
     }
 
     private static stripQuotes(value: string): string {
         return value.replace(/^"(.*)"$/, '$1')
+    }
+
+    private static isGitForWindowsBashPath(filePath: string): boolean {
+        const normalizedPath = path.win32.normalize(filePath).toLowerCase()
+        const gitBinBashPath = path.win32.join('git', 'bin', WINDOWS_BASH_FILENAME).toLowerCase()
+        const gitUsrBinBashPath = path.win32.join('git', 'usr', 'bin', WINDOWS_BASH_FILENAME).toLowerCase()
+
+        return normalizedPath.endsWith(`${path.win32.sep}${gitBinBashPath}`)
+            || normalizedPath.endsWith(`${path.win32.sep}${gitUsrBinBashPath}`)
     }
 
     private static async pathExists(filePath: string): Promise<boolean> {

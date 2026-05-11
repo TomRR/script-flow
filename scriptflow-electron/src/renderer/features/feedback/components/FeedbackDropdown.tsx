@@ -4,6 +4,7 @@ import { useFeedback } from '../FeedbackContext'
 import { useIssueService } from '../services/use-issue-service'
 import { useDocService } from '../services/use-doc-service'
 import { FeedbackLinkService } from '../services/feedback-link-service'
+import { FeedbackVersionLabelService } from '../services/feedback-version-label-service'
 
 interface FeedbackDropdownProps {
     isOpen: boolean
@@ -12,9 +13,10 @@ interface FeedbackDropdownProps {
 }
 
 export function FeedbackDropdown({ isOpen, onClose, onRatingSelect }: FeedbackDropdownProps) {
-    const { discovery } = useFeedback()
+    const { discovery, version } = useFeedback()
     const { bugUrl, featureUrl } = useIssueService(discovery.config, discovery.isFallback)
     const { docsUrl } = useDocService(discovery.config, discovery.isFallback)
+    const versionTag = FeedbackVersionLabelService.formatTag(version)
     const dropdownRef = React.useRef<HTMLDivElement>(null)
 
     React.useEffect(() => {
@@ -96,7 +98,10 @@ export function FeedbackDropdown({ isOpen, onClose, onRatingSelect }: FeedbackDr
                     </button>
                     <div className="-mx-1 my-1 h-px bg-muted" />
                     <div className="px-2 py-1.5">
-                        <span className="text-xs text-muted-foreground">Rate Scriptflow</span>
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-xs text-muted-foreground">Rate Scriptflow</span>
+                            <span className="text-xs text-muted-foreground">Version {versionTag}</span>
+                        </div>
                         <div className="mt-2 flex justify-center gap-2">
                             <button
                                 onClick={() => handleRating(1)}

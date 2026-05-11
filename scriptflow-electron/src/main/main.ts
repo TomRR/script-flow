@@ -27,6 +27,10 @@ if (!app.isPackaged) {
     process.title = AppIdentityService.getProductName()
 }
 
+if (platform.platform === 'win32') {
+    app.setAppUserModelId(AppIdentityService.getAppId())
+}
+
 const iconPath = path.join(process.env.VITE_PUBLIC || '', 'icon.png')
 
 let win: BrowserWindow | null

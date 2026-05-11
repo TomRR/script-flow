@@ -13,7 +13,7 @@ describe('BashRuntimeService', () => {
         expect(fileExists).not.toHaveBeenCalled()
     })
 
-    test('resolves bash.exe from PATH on Windows', async () => {
+    test('resolves Git Bash from PATH on Windows', async () => {
         const gitBinPath = 'C:\\Program Files\\Git\\bin'
         const expectedPath = path.win32.join(gitBinPath, 'bash.exe')
         const fileExists = jest.fn<Promise<boolean>, [string]>().mockImplementation(async (filePath) => {
@@ -23,6 +23,42 @@ describe('BashRuntimeService', () => {
             platform: 'win32',
             env: {
                 PATH: `${gitBinPath};C:\\Windows\\System32`,
+            },
+            fileExists,
+        })
+
+        await expect(service.resolveCommand()).resolves.toBe(expectedPath)
+    })
+
+    test('prefers common Git Bash install locations over incompatible bash.exe on PATH', async () => {
+        const systemBashPath = path.win32.join('C:\\Windows\\System32', 'bash.exe')
+        const expectedPath = path.win32.join('C:\\Program Files', 'Git', 'bin', 'bash.exe')
+        const fileExists = jest.fn<Promise<boolean>, [string]>().mockImplementation(async (filePath) => {
+            return filePath === systemBashPath || filePath === expectedPath
+        })
+        const service = new BashRuntimeService({
+            platform: 'win32',
+            env: {
+                PATH: 'C:\\Windows\\System32',
+                ProgramFiles: 'C:\\Program Files',
+            },
+            fileExists,
+        })
+
+        await expect(service.resolveCommand()).resolves.toBe(expectedPath)
+    })
+
+    test('ignores incompatible bash.exe candidates before Git Bash on PATH', async () => {
+        const systemBashPath = path.win32.join('C:\\Windows\\System32', 'bash.exe')
+        const gitBinPath = 'D:\\Tools\\Git\\bin'
+        const expectedPath = path.win32.join(gitBinPath, 'bash.exe')
+        const fileExists = jest.fn<Promise<boolean>, [string]>().mockImplementation(async (filePath) => {
+            return filePath === systemBashPath || filePath === expectedPath
+        })
+        const service = new BashRuntimeService({
+            platform: 'win32',
+            env: {
+                PATH: `C:\\Windows\\System32;${gitBinPath}`,
             },
             fileExists,
         })
@@ -61,7 +97,27 @@ describe('BashRuntimeService', () => {
         })
 
         await expect(service.resolveCommand()).rejects.toThrow(
-            'Git Bash not found. Install Git for Windows and ensure bash.exe is available on PATH or in a standard Git installation folder',
+            'Git Bash not found. Install Git for Windows or put Git Bash ahead of incompatible bash.exe entries on PATH',
+        )
+    })
+
+    test('reports rejected incompatible bash.exe candidates when Git Bash cannot be found on Windows', async () => {
+        const systemBashPath = path.win32.join('C:\\Windows\\System32', 'bash.exe')
+        const wslBashPath = path.win32.join('C:\\Windows\\System32\\Wsl', 'bash.exe')
+        const fileExists = jest.fn<Promise<boolean>, [string]>().mockImplementation(async (filePath) => {
+            return filePath === systemBashPath || filePath === wslBashPath
+        })
+        const service = new BashRuntimeService({
+            platform: 'win32',
+            env: {
+                PATH: 'C:\\Windows\\System32;C:\\Windows\\System32\\Wsl',
+                ProgramFiles: 'C:\\Program Files',
+            },
+            fileExists,
+        })
+
+        await expect(service.resolveCommand()).rejects.toThrow(
+            `Rejected non-Git Bash candidates found on PATH: ${systemBashPath}, ${wslBashPath}`,
         )
     })
 })
