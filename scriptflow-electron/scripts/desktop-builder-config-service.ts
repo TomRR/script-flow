@@ -160,7 +160,10 @@ export class DesktopBuilderConfigService {
 
     static writeBuilderConfig(options: BuildDesktopArtifactOptions, environment: NodeJS.ProcessEnv): string {
         const builderConfig = DesktopBuilderConfigService.createBuilderConfig(options, environment)
-        const configPath = path.join(tmpdir(), `scriptflow-builder-${options.platform}-${options.arch}-${Date.now()}.json`)
+        const configPath = path.join(
+            tmpdir(),
+            `scriptflow-builder-${options.platform}-${options.arch}-${Date.now()}.json`,
+        )
 
         writeFileSync(configPath, JSON.stringify(builderConfig, null, 4), 'utf8')
 

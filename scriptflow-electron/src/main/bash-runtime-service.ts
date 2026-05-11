@@ -5,7 +5,7 @@ const WINDOWS_BASH_FILENAME = 'bash.exe'
 const WINDOWS_PATH_DELIMITER = ';'
 const WINDOWS_GIT_BASH_SUBPATHS = [
     ['Git', 'bin', WINDOWS_BASH_FILENAME],
-    ['Git', 'usr', 'bin', WINDOWS_BASH_FILENAME]
+    ['Git', 'usr', 'bin', WINDOWS_BASH_FILENAME],
 ]
 
 interface BashRuntimeServiceOptions {
@@ -98,7 +98,7 @@ export class BashRuntimeService {
         ].filter((root): root is string => Boolean(root))
 
         return installRoots.flatMap((root) =>
-            WINDOWS_GIT_BASH_SUBPATHS.map((segments) => this.pathModule.join(root, ...segments))
+            WINDOWS_GIT_BASH_SUBPATHS.map((segments) => this.pathModule.join(root, ...segments)),
         )
     }
 
@@ -122,8 +122,10 @@ export class BashRuntimeService {
         const gitBinBashPath = path.win32.join('git', 'bin', WINDOWS_BASH_FILENAME).toLowerCase()
         const gitUsrBinBashPath = path.win32.join('git', 'usr', 'bin', WINDOWS_BASH_FILENAME).toLowerCase()
 
-        return normalizedPath.endsWith(`${path.win32.sep}${gitBinBashPath}`)
-            || normalizedPath.endsWith(`${path.win32.sep}${gitUsrBinBashPath}`)
+        return (
+            normalizedPath.endsWith(`${path.win32.sep}${gitBinBashPath}`) ||
+            normalizedPath.endsWith(`${path.win32.sep}${gitUsrBinBashPath}`)
+        )
     }
 
     private static async pathExists(filePath: string): Promise<boolean> {
