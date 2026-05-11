@@ -16,7 +16,7 @@ export function FeedbackDropdown({ isOpen, onClose, onRatingSelect }: FeedbackDr
     const { discovery, version } = useFeedback()
     const { bugUrl, featureUrl } = useIssueService(discovery.config, discovery.isFallback)
     const { docsUrl } = useDocService(discovery.config, discovery.isFallback)
-    const versionTag = FeedbackVersionLabelService.formatTag(version)
+    const versionLabel = FeedbackVersionLabelService.formatLabel(version)
     const dropdownRef = React.useRef<HTMLDivElement>(null)
 
     React.useEffect(() => {
@@ -100,7 +100,7 @@ export function FeedbackDropdown({ isOpen, onClose, onRatingSelect }: FeedbackDr
                     <div className="px-2 py-1.5">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-xs text-muted-foreground">Rate Scriptflow</span>
-                            <span className="text-xs text-muted-foreground">Version {versionTag}</span>
+                            <span className="text-xs text-muted-foreground">Version {versionLabel}</span>
                         </div>
                         <div className="mt-2 flex justify-center gap-2">
                             <button

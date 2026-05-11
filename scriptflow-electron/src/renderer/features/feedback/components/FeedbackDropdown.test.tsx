@@ -57,9 +57,9 @@ describe('FeedbackDropdown', () => {
         expect(onClose).toHaveBeenCalled()
     })
 
-    test('shows the current version as a release tag in the rating section', () => {
+    test('shows the current version label in the rating section', () => {
         render(<FeedbackDropdown isOpen={true} onClose={jest.fn()} onRatingSelect={jest.fn()} />)
 
-        expect(screen.getByText('Version v1.2.3')).toBeInTheDocument()
+        expect(screen.getByText('Version 1.2.3')).toBeInTheDocument()
     })
 })
