@@ -98,32 +98,32 @@ export function FeedbackDropdown({ isOpen, onClose, onRatingSelect }: FeedbackDr
                     </button>
                     <div className="-mx-1 my-1 h-px bg-muted" />
                     <div className="px-2 py-1.5">
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col items-center gap-2">
                             <span className="text-xs text-muted-foreground">Rate Scriptflow</span>
+                            <div className="flex justify-center gap-2">
+                                <button
+                                    onClick={() => handleRating(1)}
+                                    className="text-2xl hover:scale-110 transition-transform p-1 rounded hover:bg-accent"
+                                    aria-label="Rate 1 - Poor"
+                                >
+                                    😡
+                                </button>
+                                <button
+                                    onClick={() => handleRating(2)}
+                                    className="text-2xl hover:scale-110 transition-transform p-1 rounded hover:bg-accent"
+                                    aria-label="Rate 2 - Okay"
+                                >
+                                    😐
+                                </button>
+                                <button
+                                    onClick={() => handleRating(3)}
+                                    className="text-2xl hover:scale-110 transition-transform p-1 rounded hover:bg-accent"
+                                    aria-label="Rate 3 - Great"
+                                >
+                                    😍
+                                </button>
+                            </div>
                             <span className="text-xs text-muted-foreground">Version {versionLabel}</span>
-                        </div>
-                        <div className="mt-2 flex justify-center gap-2">
-                            <button
-                                onClick={() => handleRating(1)}
-                                className="text-2xl hover:scale-110 transition-transform p-1 rounded hover:bg-accent"
-                                aria-label="Rate 1 - Poor"
-                            >
-                                😡
-                            </button>
-                            <button
-                                onClick={() => handleRating(2)}
-                                className="text-2xl hover:scale-110 transition-transform p-1 rounded hover:bg-accent"
-                                aria-label="Rate 2 - Okay"
-                            >
-                                😐
-                            </button>
-                            <button
-                                onClick={() => handleRating(3)}
-                                className="text-2xl hover:scale-110 transition-transform p-1 rounded hover:bg-accent"
-                                aria-label="Rate 3 - Great"
-                            >
-                                😍
-                            </button>
                         </div>
                     </div>
                 </>

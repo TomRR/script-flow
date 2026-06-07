@@ -21,7 +21,7 @@ describe('DesktopBuilderConfigService', () => {
 
         expect(winConfig.icon).toBe('build/icon.ico')
         expect(winConfig.target).toEqual(['nsis'])
-        expect(winConfig.signAndEditExecutable).toBe(false)
+        expect(winConfig.signAndEditExecutable).toBeUndefined()
         expect(nsisConfig.installerIcon).toBe('build/icon.ico')
         expect(nsisConfig.uninstallerIcon).toBe('build/icon.ico')
     })

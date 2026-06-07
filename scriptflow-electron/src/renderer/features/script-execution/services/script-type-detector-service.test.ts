@@ -1,6 +1,25 @@
-import { ScriptTypeDetectorService, ScriptType } from './script-type-detector-service'
+import { ScriptTypeDetectorService } from './script-type-detector-service'
 
 describe('ScriptTypeDetectorService', () => {
+    describe('detectBuiltInType', () => {
+        test('detects supported built-in runners', () => {
+            expect(ScriptTypeDetectorService.detectBuiltInType('deploy.sh')).toBe('bash')
+            expect(ScriptTypeDetectorService.detectBuiltInType('deploy.bash')).toBe('bash')
+            expect(ScriptTypeDetectorService.detectBuiltInType('build.py')).toBe('python')
+            expect(ScriptTypeDetectorService.detectBuiltInType('Program.cs')).toBe('csharp')
+            expect(ScriptTypeDetectorService.detectBuiltInType('TestProject.csproj')).toBe('csharp')
+            expect(ScriptTypeDetectorService.detectBuiltInType('install.ps1')).toBe('powershell')
+            expect(ScriptTypeDetectorService.detectBuiltInType('install.ps')).toBe('powershell')
+        })
+
+        test('does not detect custom or unknown extensions as built-in runners', () => {
+            expect(ScriptTypeDetectorService.detectBuiltInType('install.bat')).toBeNull()
+            expect(ScriptTypeDetectorService.detectBuiltInType('setup.cmd')).toBeNull()
+            expect(ScriptTypeDetectorService.detectBuiltInType('script.js')).toBeNull()
+            expect(ScriptTypeDetectorService.detectBuiltInType('Makefile')).toBeNull()
+        })
+    })
+
     describe('detectType', () => {
         describe('bash scripts', () => {
             test('detects .sh extension as bash', () => {
@@ -71,6 +90,10 @@ describe('ScriptTypeDetectorService', () => {
         describe('csharp scripts', () => {
             test('detects .cs extension as csharp', () => {
                 expect(ScriptTypeDetectorService.detectType('script.cs')).toBe('csharp')
+            })
+
+            test('detects .csproj extension as csharp', () => {
+                expect(ScriptTypeDetectorService.detectType('TestProject.csproj')).toBe('csharp')
             })
 
             test('detects .CS extension (uppercase) as csharp', () => {

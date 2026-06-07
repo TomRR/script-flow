@@ -3,15 +3,12 @@ import { PanelLeft } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { Toaster } from './components/ui/sonner'
 import { Sidebar } from './features/sidebar/components/Sidebar'
+import { SidebarService } from './features/sidebar/services/sidebar-service'
 import { Welcome } from './components/Welcome'
 import { WorkflowPage } from './features/workflow/components/WorkflowPage'
+import { StartupWorkflowSelectionService } from './features/workflow/services/startup-workflow-selection-service'
 import { FeedbackProvider } from './features/feedback'
-
-export interface SelectedPage {
-    sectionId: string
-    subSectionKey: string
-    title: string
-}
+import type { SelectedPage } from './features/workflow/types'
 
 function App() {
     const [isConfigured, setIsConfigured] = useState<boolean>(false)
@@ -44,6 +41,9 @@ function App() {
                 const vaultPath = await window.api.vault.checkConfig()
                 if (vaultPath) {
                     setIsConfigured(true)
+                    const sections = await SidebarService.getSections()
+                    const initialSelectedPage = StartupWorkflowSelectionService.getInitialSelectedPage(sections)
+                    setSelectedPage(initialSelectedPage)
                 }
             } catch (error) {
                 console.error('Failed to check config:', error)

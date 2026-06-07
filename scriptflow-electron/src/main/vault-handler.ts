@@ -39,11 +39,14 @@ export interface MultiValueEnvVariable {
 }
 
 export type EnvValue = StaticEnvValue | MultiValueEnvVariable
+export type ScriptType = 'bash' | 'csharp' | 'python' | 'powershell' | 'custom'
+export type ScriptTypeMode = 'auto' | 'manual'
 
 export interface ScriptEntry {
     id: string
     name?: string
-    type: 'bash' | 'csharp' | 'python' | 'powershell' | 'custom'
+    type: ScriptType
+    scriptTypeMode?: ScriptTypeMode
     path: string
     customCommand?: string
     env?: Record<string, EnvValue>

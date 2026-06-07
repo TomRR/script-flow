@@ -16,7 +16,8 @@
                             "name": "Basic Bash",
                             "type": "bash",
                             "path": "scripts/bash/basic.sh",
-                            "placement": 0
+                            "placement": 0,
+                            "scriptTypeMode": "auto"
                         }
                     ]
                 },
@@ -42,7 +43,8 @@
                             "name": "Basic Python",
                             "type": "python",
                             "path": "scripts/python/basic.py",
-                            "placement": 0
+                            "placement": 0,
+                            "scriptTypeMode": "manual"
                         }
                     ]
                 },
@@ -55,7 +57,8 @@
                             "name": "Basic C#",
                             "type": "csharp",
                             "path": "scripts/csharp/Basic",
-                            "placement": 0
+                            "placement": 0,
+                            "scriptTypeMode": "manual"
                         }
                     ]
                 }

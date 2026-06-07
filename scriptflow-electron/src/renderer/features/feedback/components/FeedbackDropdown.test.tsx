@@ -57,9 +57,15 @@ describe('FeedbackDropdown', () => {
         expect(onClose).toHaveBeenCalled()
     })
 
-    test('shows the current version label in the rating section', () => {
+    test('shows the current version label below the rating options', () => {
         render(<FeedbackDropdown isOpen={true} onClose={jest.fn()} onRatingSelect={jest.fn()} />)
 
-        expect(screen.getByText('Version 1.2.3')).toBeInTheDocument()
+        const title = screen.getByText('Rate Scriptflow')
+        const firstRating = screen.getByRole('button', { name: 'Rate 1 - Poor' })
+        const lastRating = screen.getByRole('button', { name: 'Rate 3 - Great' })
+        const version = screen.getByText('Version 1.2.3')
+
+        expect(title.compareDocumentPosition(firstRating) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(lastRating.compareDocumentPosition(version) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 })

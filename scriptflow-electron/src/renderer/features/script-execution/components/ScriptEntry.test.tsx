@@ -6,6 +6,7 @@ import { ScriptEntryComponent } from './ScriptEntry'
 import type { ScriptEntry } from '../../../../renderer.d'
 import { CopyScriptService } from '../services/copy-script-service'
 import { MultiValueVariableService } from '../services/multi-value-variable-service'
+import { UNSUPPORTED_AUTO_RUNNER_MESSAGE } from '../services/script-runner-selection-service'
 
 // Mock the services
 jest.mock('../services/copy-script-service')
@@ -847,6 +848,7 @@ describe('ScriptEntryComponent - Output Clearing', () => {
     const mockOnUpdate = jest.fn()
     const mockOnRemove = jest.fn()
     const mockOnRun = jest.fn()
+    const clipboardWriteText = jest.fn()
     const outputListeners: Array<(data: { scriptId: string; data: string }) => void> = []
 
     const emitOutput = (scriptId: string, data: string) => {
@@ -855,7 +857,14 @@ describe('ScriptEntryComponent - Output Clearing', () => {
 
     beforeEach(() => {
         jest.clearAllMocks()
+        clipboardWriteText.mockResolvedValue(undefined)
         outputListeners.length = 0
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: {
+                writeText: clipboardWriteText,
+            },
+        })
         const { SecretsService } = require('../../secrets/services/secrets-service')
         SecretsService.getSecrets = jest.fn().mockResolvedValue({
             version: '1.0',
@@ -873,6 +882,101 @@ describe('ScriptEntryComponent - Output Clearing', () => {
                 openScript: jest.fn(),
             },
         }
+    })
+
+    it('should show a copy output button when output is visible', async () => {
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={mockScript}
+                scripts={[mockScript]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            emitOutput(mockScript.id, 'copyable output')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /copy output/i })).toBeInTheDocument()
+        })
+    })
+
+    it('should copy the visible output for the current script entry', async () => {
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={mockScript}
+                scripts={[mockScript]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            emitOutput(mockScript.id, 'first message')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText('first message')).toBeInTheDocument()
+        })
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /copy output/i }))
+        })
+
+        await waitFor(() => {
+            expect(clipboardWriteText).toHaveBeenCalledWith('first message')
+        })
+    })
+
+    it('should copy multiline output without changing it', async () => {
+        const multilineOutput = 'first line\nsecond line\r\nthird line'
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={mockScript}
+                scripts={[mockScript]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            emitOutput(mockScript.id, multilineOutput)
+        })
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /copy output/i })).toBeInTheDocument()
+        })
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /copy output/i }))
+        })
+
+        await waitFor(() => {
+            expect(clipboardWriteText).toHaveBeenCalledWith(multilineOutput)
+        })
+    })
+
+    it('should disable the copy output button when the output panel is empty', async () => {
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={mockScript}
+                scripts={[mockScript]}
+                executionStatus="running"
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /copy output/i })).toBeDisabled()
+        })
     })
 
     it('should clear the visible output for the current script entry', async () => {
@@ -1223,5 +1327,243 @@ describe('ScriptEntryComponent - Delete Variable/Secret Confirmation', () => {
                 expect(mockOnUpdate).not.toHaveBeenCalled()
             })
         })
+    })
+})
+
+describe('ScriptEntryComponent - Script Runner Selection', () => {
+    const mockOnUpdate = jest.fn()
+    const mockOnRemove = jest.fn()
+    const mockOnRun = jest.fn()
+    const openScript = jest.fn()
+
+    const createRunnerScript = (overrides: Partial<ScriptEntry> = {}): ScriptEntry => ({
+        id: 'runner-1',
+        type: 'bash',
+        scriptTypeMode: 'auto',
+        path: '/test/script.sh',
+        name: 'Runner Script',
+        placement: 0,
+        ...overrides,
+    })
+
+    beforeEach(() => {
+        jest.clearAllMocks()
+        const { SecretsService } = require('../../secrets/services/secrets-service')
+        SecretsService.getSecrets = jest.fn().mockResolvedValue({
+            version: '1.0',
+            secrets: {},
+        })
+        ;(global as any).window.api = {
+            script: {
+                onOutput: jest.fn().mockReturnValue(jest.fn()),
+                stopScript: jest.fn(),
+            },
+            dialog: {
+                openScript,
+            },
+        }
+    })
+
+    it('should render auto and manual mode radio buttons', async () => {
+        const script = createRunnerScript()
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        expect(screen.getByRole('radio', { name: 'Auto' })).toBeInTheDocument()
+        expect(screen.getByRole('radio', { name: 'Manual' })).toBeInTheDocument()
+        expect(screen.getByText('Detected runner: Bash')).toBeInTheDocument()
+    })
+
+    it('should never disable the auto mode radio button', async () => {
+        const script = createRunnerScript({ path: '/test/main.ts', scriptTypeMode: 'auto' })
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        expect(screen.getByRole('radio', { name: 'Auto' })).not.toBeDisabled()
+    })
+
+    it('should show csharp as the detected runner for csproj files', async () => {
+        const script = createRunnerScript({
+            type: 'csharp',
+            path: '/test/TestProject.csproj',
+            scriptTypeMode: 'auto',
+        })
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        expect(screen.getByText('Detected runner: C#')).toBeInTheDocument()
+    })
+
+    it('should show a warning when auto cannot detect the runner', async () => {
+        const script = createRunnerScript({ path: '/test/main.ts', scriptTypeMode: 'auto' })
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        expect(screen.getByText(UNSUPPORTED_AUTO_RUNNER_MESSAGE)).toBeInTheDocument()
+    })
+
+    it('should show the runner dropdown in manual mode', async () => {
+        const script = createRunnerScript({ type: 'python', scriptTypeMode: 'manual' })
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        expect(screen.getByText('Runner')).toBeInTheDocument()
+        expect(screen.getByRole('combobox')).toBeInTheDocument()
+        expect(screen.queryByText('Detected runner: Bash')).not.toBeInTheDocument()
+    })
+
+    it('should show custom command input only for manual custom scripts', async () => {
+        const manualCustomScript = createRunnerScript({
+            type: 'custom',
+            scriptTypeMode: 'manual',
+            customCommand: 'node',
+        })
+        const { rerender } = await renderWithAct(
+            <ScriptEntryComponent
+                script={manualCustomScript}
+                scripts={[manualCustomScript]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        expect(screen.getByPlaceholderText('Enter custom command (e.g., node script.js)')).toBeInTheDocument()
+
+        const autoScript = createRunnerScript()
+        rerender(
+            <ScriptEntryComponent
+                script={autoScript}
+                scripts={[autoScript]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        expect(screen.queryByPlaceholderText('Enter custom command (e.g., node script.js)')).not.toBeInTheDocument()
+    })
+
+    it('should update auto script type when selecting a supported file', async () => {
+        const script = createRunnerScript()
+        openScript.mockResolvedValue('/test/build.py')
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            fireEvent.click(screen.getByText('Select Script'))
+        })
+
+        await waitFor(() => {
+            expect(mockOnUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: '/test/build.py',
+                    type: 'python',
+                    scriptTypeMode: 'auto',
+                }),
+            )
+        })
+    })
+
+    it('should keep auto mode when selecting an unsupported file', async () => {
+        const script = createRunnerScript({ customCommand: 'node' })
+        openScript.mockResolvedValue('/test/setup.cmd')
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            fireEvent.click(screen.getByText('Select Script'))
+        })
+
+        await waitFor(() => {
+            expect(mockOnUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: '/test/setup.cmd',
+                    type: 'bash',
+                    scriptTypeMode: 'auto',
+                    customCommand: 'node',
+                }),
+            )
+        })
+    })
+
+    it('should block running unsupported auto scripts and log guidance', async () => {
+        const script = createRunnerScript({ path: '/test/main.ts', scriptTypeMode: 'auto' })
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+        await renderWithAct(
+            <ScriptEntryComponent
+                script={script}
+                scripts={[script]}
+                onUpdate={mockOnUpdate}
+                onRemove={mockOnRemove}
+                onRun={mockOnRun}
+            />,
+        )
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /run script/i }))
+        })
+
+        expect(warnSpy).toHaveBeenCalledWith(UNSUPPORTED_AUTO_RUNNER_MESSAGE)
+        expect(screen.getAllByText(UNSUPPORTED_AUTO_RUNNER_MESSAGE)).toHaveLength(2)
+        expect(mockOnRun).not.toHaveBeenCalled()
+        warnSpy.mockRestore()
     })
 })

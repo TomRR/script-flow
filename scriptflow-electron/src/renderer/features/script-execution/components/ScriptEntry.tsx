@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import type { ScriptEntry, ExecutionStatus } from '../../../../renderer.d'
 import { ScriptEntryStatusService } from '../services/script-entry-status-service'
@@ -15,6 +15,7 @@ import {
     Settings,
     FileEdit,
     Eraser,
+    Check,
 } from 'lucide-react'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -45,7 +46,9 @@ import { MultiValueDropdown } from './MultiValueDropdown'
 import { MultiValueRadio } from './MultiValueRadio'
 import { MultiValueVariableDialog } from './MultiValueVariableDialog'
 import { useScriptOutput } from '../hooks/use-script-output'
-import type { MultiValueEnvVariable, EnvValue } from '../../../../renderer.d'
+import { SCRIPT_RUNNER_OPTIONS, ScriptRunnerSelectionService } from '../services/script-runner-selection-service'
+import { OutputClipboardService } from '../services/output-clipboard-service'
+import type { MultiValueEnvVariable, EnvValue, ScriptType, ScriptTypeMode } from '../../../../renderer.d'
 
 interface ScriptEntryProps {
     script: ScriptEntry
@@ -73,6 +76,8 @@ export function ScriptEntryComponent({
 }: ScriptEntryProps) {
     const [isRunning, setIsRunning] = useState(false)
     const { output, appendOutput, clearOutput } = useScriptOutput()
+    const [outputCopied, setOutputCopied] = useState(false)
+    const outputCopiedTimeoutRef = useRef<number | null>(null)
     const [open, setOpen] = useState(false)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [editFormState, setEditFormState] = useState<EditFormState>(EnvSecretEditorService.createInitialState())
@@ -109,6 +114,12 @@ export function ScriptEntryComponent({
     const { isAddingEnv, isAddingSecret, envEditState, secretEditState } = editFormState
     const { editingEnvKey, newEnvKey, newEnvValue } = envEditState
     const { editingSecretName } = secretEditState
+    const scriptTypeMode = ScriptRunnerSelectionService.getMode(script)
+    const detectedAutoType = ScriptRunnerSelectionService.detectAutoType(script.path)
+    const autoRunnerLabel = detectedAutoType
+        ? ScriptRunnerSelectionService.getRunnerLabel(detectedAutoType)
+        : 'Unsupported'
+    const unsupportedAutoWarning = ScriptRunnerSelectionService.getUnsupportedAutoWarning(script)
 
     useEffect(() => {
         const loadSecrets = async () => {
@@ -129,22 +140,47 @@ export function ScriptEntryComponent({
         }
     }, [appendOutput, script.id])
 
+    useEffect(() => {
+        return () => {
+            if (outputCopiedTimeoutRef.current !== null) {
+                window.clearTimeout(outputCopiedTimeoutRef.current)
+            }
+        }
+    }, [])
+
+    const handleTypeModeChange = (value: string) => {
+        onUpdate(ScriptRunnerSelectionService.updateMode(script, value as ScriptTypeMode))
+    }
+
     const handleTypeChange = (value: string) => {
-        onUpdate({
-            ...script,
-            type: value as 'bash' | 'csharp' | 'python' | 'powershell' | 'custom',
-        })
+        onUpdate(ScriptRunnerSelectionService.updateManualType(script, value as ScriptType))
     }
 
     const handleCustomCommandChange = (value: string) => {
         onUpdate({ ...script, customCommand: value })
     }
 
+    const handleCopyOutput = async () => {
+        const copied = await OutputClipboardService.copyOutput(output)
+        if (!copied) {
+            return
+        }
+
+        setOutputCopied(true)
+        if (outputCopiedTimeoutRef.current !== null) {
+            window.clearTimeout(outputCopiedTimeoutRef.current)
+        }
+        outputCopiedTimeoutRef.current = window.setTimeout(() => {
+            setOutputCopied(false)
+            outputCopiedTimeoutRef.current = null
+        }, 2000)
+    }
+
     const handleFileSelect = async () => {
         try {
             const path = await window.api.dialog.openScript()
             if (path) {
-                onUpdate({ ...script, path })
+                onUpdate(ScriptRunnerSelectionService.updatePath(script, path))
             }
         } catch (error) {
             console.error('Failed to select file:', error)
@@ -286,6 +322,13 @@ export function ScriptEntryComponent({
     }
 
     const handleRunClick = async () => {
+        if (unsupportedAutoWarning) {
+            console.warn(unsupportedAutoWarning)
+            clearOutput()
+            appendOutput(unsupportedAutoWarning)
+            return
+        }
+
         setIsRunning(true)
         clearOutput()
         try {
@@ -845,38 +888,49 @@ export function ScriptEntryComponent({
             </div>
 
             <hr></hr>
-            {/* Script Type Selection */}
-            <div className="flex items-center gap-2 ml-2.5">
+            {/* Script Runner Selection */}
+            <div className="flex flex-col gap-2 ml-2.5">
                 <RadioGroup
-                    value={script.type}
-                    onValueChange={handleTypeChange}
+                    value={scriptTypeMode}
+                    onValueChange={handleTypeModeChange}
                     className="flex flex-row gap-4 flex-wrap"
                 >
                     <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="bash" id={`bash-${script.id}`} />
-                        <Label htmlFor={`bash-${script.id}`}>Bash</Label>
+                        <RadioGroupItem value="auto" id={`auto-${script.id}`} />
+                        <Label htmlFor={`auto-${script.id}`}>Auto</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="csharp" id={`csharp-${script.id}`} />
-                        <Label htmlFor={`csharp-${script.id}`}>C#</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="python" id={`python-${script.id}`} />
-                        <Label htmlFor={`python-${script.id}`}>Python</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="powershell" id={`powershell-${script.id}`} />
-                        <Label htmlFor={`powershell-${script.id}`}>PowerShell</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id={`custom-${script.id}`} />
-                        <Label htmlFor={`custom-${script.id}`}>Custom</Label>
+                        <RadioGroupItem value="manual" id={`manual-${script.id}`} />
+                        <Label htmlFor={`manual-${script.id}`}>Manual</Label>
                     </div>
                 </RadioGroup>
+                {scriptTypeMode === 'auto' ? (
+                    unsupportedAutoWarning ? (
+                        <div className="text-xs text-destructive">{unsupportedAutoWarning}</div>
+                    ) : (
+                        <div className="text-xs text-muted-foreground">Detected runner: {autoRunnerLabel}</div>
+                    )
+                ) : (
+                    <div className="flex flex-col gap-1 max-w-xs">
+                        <Label className="text-xs text-muted-foreground">Runner</Label>
+                        <Select value={script.type} onValueChange={handleTypeChange}>
+                            <SelectTrigger className="h-9">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {SCRIPT_RUNNER_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
             </div>
 
             {/* Custom Command Input */}
-            {script.type === 'custom' && (
+            {scriptTypeMode === 'manual' && script.type === 'custom' && (
                 <div className="flex flex-col gap-1">
                     <Label className="text-xs text-muted-foreground">Custom Command</Label>
                     <Input
@@ -890,11 +944,11 @@ export function ScriptEntryComponent({
 
             <div className="flex gap-2">
                 {!isRunning ? (
-                    <Button variant="ghost" size="icon" onClick={handleRunClick}>
+                    <Button variant="ghost" size="icon" onClick={handleRunClick} aria-label="Run script">
                         <Play className="h-4 w-4" />
                     </Button>
                 ) : (
-                    <Button variant="destructive" size="icon" onClick={handleStopClick}>
+                    <Button variant="destructive" size="icon" onClick={handleStopClick} aria-label="Stop script">
                         <div className="h-3 w-3 bg-current rounded-sm" />
                     </Button>
                 )}
@@ -923,6 +977,17 @@ export function ScriptEntryComponent({
                     <Button
                         variant="ghost"
                         size="icon"
+                        onClick={handleCopyOutput}
+                        disabled={!output}
+                        title="Copy output"
+                        aria-label="Copy output"
+                        className="absolute right-9 top-1 h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"
+                    >
+                        {outputCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={clearOutput}
                         title="Clear output"
                         aria-label="Clear output"
@@ -930,7 +995,7 @@ export function ScriptEntryComponent({
                     >
                         <Eraser className="h-3.5 w-3.5" />
                     </Button>
-                    <div className="h-full overflow-y-auto whitespace-pre-wrap p-2 pr-10">{output}</div>
+                    <div className="h-full overflow-y-auto whitespace-pre-wrap p-2 pr-20">{output}</div>
                 </div>
             )}
 

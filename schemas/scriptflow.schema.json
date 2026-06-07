@@ -139,6 +139,13 @@
                         "custom"
                     ]
                 },
+                "scriptTypeMode": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "manual"
+                    ]
+                },
                 "path": {
                     "type": "string"
                 },

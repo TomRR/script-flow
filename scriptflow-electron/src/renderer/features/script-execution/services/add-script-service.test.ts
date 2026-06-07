@@ -117,6 +117,7 @@ describe('AddScriptService', () => {
                 'sub-1',
                 expect.objectContaining({
                     type: 'bash',
+                    scriptTypeMode: 'auto',
                     path: 'scripts/deploy.sh',
                     name: 'deploy',
                 }),
@@ -148,6 +149,7 @@ describe('AddScriptService', () => {
                 'sub-1',
                 expect.objectContaining({
                     type: 'python',
+                    scriptTypeMode: 'auto',
                     name: 'build',
                 }),
             )
@@ -170,6 +172,7 @@ describe('AddScriptService', () => {
                 'sub-1',
                 expect.objectContaining({
                     type: 'powershell',
+                    scriptTypeMode: 'auto',
                     name: 'install',
                 }),
             )
@@ -192,7 +195,32 @@ describe('AddScriptService', () => {
                 'sub-1',
                 expect.objectContaining({
                     type: 'csharp',
+                    scriptTypeMode: 'auto',
                     name: 'Program',
+                }),
+            )
+        })
+
+        test('detects csharp type for .csproj files', async () => {
+            const mockScript: ScriptEntry = {
+                id: '1',
+                name: 'TestProject',
+                type: 'csharp',
+                scriptTypeMode: 'auto',
+                path: 'scripts/TestProject.csproj',
+                placement: 0,
+            }
+            mockVault.addScriptToSubSection.mockResolvedValue(mockScript)
+
+            await AddScriptService.addSingleScript('section-1', 'sub-1', 'scripts/TestProject.csproj')
+
+            expect(mockVault.addScriptToSubSection).toHaveBeenCalledWith(
+                'section-1',
+                'sub-1',
+                expect.objectContaining({
+                    type: 'csharp',
+                    scriptTypeMode: 'auto',
+                    name: 'TestProject',
                 }),
             )
         })
@@ -214,6 +242,31 @@ describe('AddScriptService', () => {
                 'sub-1',
                 expect.objectContaining({
                     type: 'custom',
+                    scriptTypeMode: 'manual',
+                    name: 'setup',
+                }),
+            )
+        })
+
+        test('detects custom type for .cmd files in manual mode', async () => {
+            const mockScript: ScriptEntry = {
+                id: '1',
+                name: 'setup',
+                type: 'custom',
+                scriptTypeMode: 'manual',
+                path: 'scripts/setup.cmd',
+                placement: 0,
+            }
+            mockVault.addScriptToSubSection.mockResolvedValue(mockScript)
+
+            await AddScriptService.addSingleScript('section-1', 'sub-1', 'scripts/setup.cmd')
+
+            expect(mockVault.addScriptToSubSection).toHaveBeenCalledWith(
+                'section-1',
+                'sub-1',
+                expect.objectContaining({
+                    type: 'custom',
+                    scriptTypeMode: 'manual',
                     name: 'setup',
                 }),
             )
@@ -252,9 +305,10 @@ describe('AddScriptService', () => {
             expect(extensions).toContain('.ps')
             expect(extensions).toContain('.py')
             expect(extensions).toContain('.cs')
+            expect(extensions).toContain('.csproj')
             expect(extensions).toContain('.bat')
             expect(extensions).toContain('.cmd')
-            expect(extensions.length).toBe(8)
+            expect(extensions.length).toBe(9)
         })
     })
 
@@ -275,6 +329,7 @@ describe('AddScriptService', () => {
 
         test('returns true for valid csharp extension', () => {
             expect(AddScriptService.isValidScriptExtension('script.cs')).toBe(true)
+            expect(AddScriptService.isValidScriptExtension('TestProject.csproj')).toBe(true)
         })
 
         test('returns true for valid custom extensions', () => {
@@ -301,15 +356,24 @@ describe('AddScriptService', () => {
 
     describe('filterValidScriptFiles', () => {
         test('filters valid script files from mixed list', () => {
-            const files = ['deploy.sh', 'build.py', 'document.pdf', 'install.ps1', 'readme.txt', 'Program.cs']
+            const files = [
+                'deploy.sh',
+                'build.py',
+                'document.pdf',
+                'install.ps1',
+                'readme.txt',
+                'Program.cs',
+                'TestProject.csproj',
+            ]
 
             const filtered = AddScriptService.filterValidScriptFiles(files)
 
-            expect(filtered).toHaveLength(4)
+            expect(filtered).toHaveLength(5)
             expect(filtered).toContain('deploy.sh')
             expect(filtered).toContain('build.py')
             expect(filtered).toContain('install.ps1')
             expect(filtered).toContain('Program.cs')
+            expect(filtered).toContain('TestProject.csproj')
             expect(filtered).not.toContain('document.pdf')
             expect(filtered).not.toContain('readme.txt')
         })

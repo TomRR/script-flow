@@ -17,6 +17,7 @@ import { DuplicateScriptEntryService } from '../../script-execution/services/dup
 import { MultiValueVariableService } from '../../script-execution/services/multi-value-variable-service'
 import { DragAndDropScriptService } from '../../script-execution/services/drag-and-drop-script-service'
 import { AddScriptService } from '../../script-execution/services/add-script-service'
+import { ScriptRunnerSelectionService } from '../../script-execution/services/script-runner-selection-service'
 import { KeyboardService } from '@/lib/services/keyboard-service'
 import { ToasterService, TOASTER_CONFIG } from '@/lib/services/toaster-service'
 import { FeedbackTrigger, FeedbackDropdown, useFeedback } from '@/features/feedback'
@@ -320,6 +321,12 @@ export function WorkflowPage({ sectionId, subSectionKey, title }: WorkflowPagePr
     }
 
     const handleRunSingle = async (script: ScriptEntry) => {
+        const unsupportedAutoWarning = ScriptRunnerSelectionService.getUnsupportedAutoWarning(script)
+        if (unsupportedAutoWarning) {
+            console.warn(unsupportedAutoWarning)
+            return
+        }
+
         try {
             setScriptExecutionStates((prev) => ({
                 ...prev,
@@ -333,6 +340,17 @@ export function WorkflowPage({ sectionId, subSectionKey, title }: WorkflowPagePr
 
     const handleRunAll = async () => {
         if (scripts.length === 0) return
+
+        const unsupportedAutoWarning = ScriptRunnerSelectionService.getFirstUnsupportedAutoWarning(scripts)
+        if (unsupportedAutoWarning) {
+            console.warn(unsupportedAutoWarning)
+            setWorkflowStatus({
+                success: false,
+                failureReason: unsupportedAutoWarning,
+            })
+            setWorkflowExecutionState('failed')
+            return
+        }
 
         setWorkflowExecutionState('running')
         setScriptExecutionStates({})

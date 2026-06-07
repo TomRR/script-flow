@@ -151,7 +151,7 @@ export class DesktopBuilderConfigService {
             builderConfig.win = {
                 icon: AppIconService.WINDOWS_ICON_RELATIVE_PATH,
                 target: [options.target],
-                ...(azureSignOptions ? { azureSignOptions } : { signAndEditExecutable: false }),
+                ...(azureSignOptions ? { azureSignOptions } : {}),
             }
         }
 

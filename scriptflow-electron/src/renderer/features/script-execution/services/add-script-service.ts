@@ -1,5 +1,5 @@
 import type { ScriptEntry } from '../../../../renderer'
-import { ScriptTypeDetectorService } from './script-type-detector-service'
+import { ScriptRunnerSelectionService } from './script-runner-selection-service'
 
 function getExtension(filePath: string): string {
     const lastDotIndex = filePath.lastIndexOf('.')
@@ -54,11 +54,11 @@ export class AddScriptService {
         subSectionKey: string,
         filePath: string,
     ): Promise<ScriptEntry | null> {
-        const type = ScriptTypeDetectorService.detectType(filePath)
+        const scriptTypeDefaults = ScriptRunnerSelectionService.getScriptDefaults(filePath)
         const name = this.generateScriptName(filePath)
 
         return window.api.vault.addScriptToSubSection(sectionId, subSectionKey, {
-            type,
+            ...scriptTypeDefaults,
             path: filePath,
             name,
             placement: 0,
@@ -70,7 +70,7 @@ export class AddScriptService {
     }
 
     static getValidScriptExtensions(): string[] {
-        return ['.sh', '.bash', '.ps1', '.ps', '.py', '.cs', '.bat', '.cmd']
+        return ['.sh', '.bash', '.ps1', '.ps', '.py', '.cs', '.csproj', '.bat', '.cmd']
     }
 
     static isValidScriptExtension(filePath: string): boolean {
