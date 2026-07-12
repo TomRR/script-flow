@@ -14,6 +14,15 @@ function createOptions(overrides: Partial<BuildDesktopArtifactOptions> = {}): Bu
 }
 
 describe('DesktopBuilderConfigService', () => {
+    test('uses the requested architecture in artifact names', () => {
+        expect(DesktopBuilderConfigService.createArtifactNamePattern('linux', 'x64')).toBe(
+            'ScriptFlow-${version}-linux-x64.${ext}',
+        )
+        expect(DesktopBuilderConfigService.createArtifactNamePattern('mac', 'arm64')).toBe(
+            'ScriptFlow-${version}-mac-arm64.${ext}',
+        )
+    })
+
     test('creates a generic Azure updater configuration from the public container URL', () => {
         const config = DesktopBuilderConfigService.createBuilderConfig(createOptions(), {
             AZURE_INSTALLER_PUBLIC_BASE_URL: 'https://downloads.example.com/installers',

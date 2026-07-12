@@ -32,8 +32,8 @@ interface AzureSignOptions {
 }
 
 export class DesktopBuilderConfigService {
-    static createArtifactNamePattern(platformValue: BuildPlatform): string {
-        return `ScriptFlow-\${version}-${platformValue}-\${arch}.\${ext}`
+    static createArtifactNamePattern(platformValue: BuildPlatform, arch: BuildArch): string {
+        return `ScriptFlow-\${version}-${platformValue}-${arch}.\${ext}`
     }
 
     static resolveAzurePublishConfig(environment: NodeJS.ProcessEnv = process.env): GenericPublishConfig | undefined {
@@ -114,7 +114,7 @@ export class DesktopBuilderConfigService {
         const builderConfig: Record<string, unknown> = {
             appId: AppIdentityService.getAppId(),
             productName: AppIdentityService.getProductName(),
-            artifactName: DesktopBuilderConfigService.createArtifactNamePattern(options.platform),
+            artifactName: DesktopBuilderConfigService.createArtifactNamePattern(options.platform, options.arch),
             directories: {
                 output: options.outputDir,
                 buildResources: 'build',
