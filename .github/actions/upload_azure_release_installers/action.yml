@@ -1,0 +1,267 @@
+name: 'Upload Azure release artifacts'
+description: 'Upload installers, updater files, and a latest.json manifest to Azure Blob Storage.'
+
+inputs:
+  app_id:
+    description: 'Stable application id used as the blob path root.'
+    required: true
+  version:
+    description: 'Semantic version without the leading v.'
+    required: true
+  tag:
+    description: 'Release tag, used as the release path segment.'
+    required: true
+  storage_account:
+    description: 'Azure Storage account name.'
+    required: true
+  container_name:
+    description: 'Azure Blob Storage container name.'
+    required: true
+  sas_token:
+    description: 'Azure Blob Storage SAS token with create, write, and read permissions.'
+    required: true
+  installer_paths:
+    description: 'Newline-separated installer paths to upload to the versioned release directory.'
+    required: true
+  updater_paths:
+    description: 'Newline-separated updater payload and manifest paths to publish at the app root.'
+    required: false
+    default: ''
+  public_base_url:
+    description: 'Optional public container URL. Defaults to the storage account blob endpoint plus container.'
+    required: false
+    default: ''
+  azcopy_version:
+    description: 'Pinned AzCopy release version used for uploads.'
+    required: false
+    default: '10.32.6'
+  azcopy_sha256:
+    description: 'SHA-256 checksum for the pinned Linux x64 AzCopy archive.'
+    required: false
+    default: '6538f7fb9ec6e4d159e44a1612ca7eee24fe7a822065a3dcbc664ef30fe85d16'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Upload installers and updater feed
+      shell: bash
+      env:
+        APP_ID: ${{ inputs.app_id }}
+        VERSION: ${{ inputs.version }}
+        TAG: ${{ inputs.tag }}
+        STORAGE_ACCOUNT: ${{ inputs.storage_account }}
+        CONTAINER_NAME: ${{ inputs.container_name }}
+        SAS_TOKEN: ${{ inputs.sas_token }}
+        INSTALLER_PATHS: ${{ inputs.installer_paths }}
+        UPDATER_PATHS: ${{ inputs.updater_paths }}
+        PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+        AZCOPY_VERSION: ${{ inputs.azcopy_version }}
+        AZCOPY_SHA256: ${{ inputs.azcopy_sha256 }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${PUBLIC_BASE_URL}" ]]; then
+          PUBLIC_BASE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER_NAME}"
+        fi
+
+        PUBLIC_BASE_URL="${PUBLIC_BASE_URL%/}"
+
+        if [[ ! "$PUBLIC_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]]; then
+          echo 'AZURE_INSTALLER_PUBLIC_BASE_URL must be an HTTPS URL.' >&2
+          exit 1
+        fi
+
+        work_dir="${RUNNER_TEMP}/azure-release-installers"
+        assets_jsonl="${work_dir}/assets.jsonl"
+        latest_json="${work_dir}/latest.json"
+        azcopy_dir="${RUNNER_TEMP}/azcopy-${AZCOPY_VERSION}"
+        azcopy_archive="${azcopy_dir}.tar.gz"
+        azcopy_url="https://github.com/Azure/azure-storage-azcopy/releases/download/v${AZCOPY_VERSION}/azcopy_linux_amd64_${AZCOPY_VERSION}.tar.gz"
+
+        mkdir -p "$work_dir"
+        : > "$assets_jsonl"
+
+        curl --fail --location --silent --show-error --output "$azcopy_archive" "$azcopy_url"
+        printf '%s  %s\n' "$AZCOPY_SHA256" "$azcopy_archive" | sha256sum --check --status
+        mkdir -p "$azcopy_dir"
+        tar --extract --gzip --file "$azcopy_archive" --directory "$azcopy_dir"
+        azcopy_executable="$(find "$azcopy_dir" -type f -name azcopy -print -quit)"
+
+        if [[ -z "$azcopy_executable" ]]; then
+          echo "AzCopy executable was not found in $azcopy_archive." >&2
+          exit 1
+        fi
+
+        chmod +x "$azcopy_executable"
+
+        append_sas_token() {
+          local url="$1"
+          local token="${SAS_TOKEN#\?}"
+
+          printf '%s?%s' "$url" "$token"
+        }
+
+        content_type_for() {
+          local file_name="$1"
+
+          case "${file_name,,}" in
+            *.dmg)
+              printf 'application/x-apple-diskimage'
+              ;;
+            *.exe)
+              printf 'application/vnd.microsoft.portable-executable'
+              ;;
+            *.appimage)
+              printf 'application/octet-stream'
+              ;;
+            *.zip | *.blockmap)
+              printf 'application/zip'
+              ;;
+            *.yml | *.yaml)
+              printf 'application/yaml'
+              ;;
+            *.json)
+              printf 'application/json'
+              ;;
+            *)
+              printf 'application/octet-stream'
+              ;;
+          esac
+        }
+
+        platform_for() {
+          local file_name="$1"
+
+          case "${file_name,,}" in
+            *.dmg)
+              printf 'macos'
+              ;;
+            *.exe)
+              printf 'windows'
+              ;;
+            *.appimage)
+              printf 'linux'
+              ;;
+            *)
+              printf 'unknown'
+              ;;
+          esac
+        }
+
+        azcopy_upload() {
+          local source_path="$1"
+          local destination_url="$2"
+          local content_type="$3"
+
+          "$azcopy_executable" copy "$source_path" "$destination_url" --overwrite=true --content-type "$content_type"
+        }
+
+        while IFS= read -r installer_path; do
+          if [[ -z "$installer_path" ]]; then
+            continue
+          fi
+
+          if [[ ! -f "$installer_path" ]]; then
+            echo "Release installer file not found: $installer_path" >&2
+            exit 1
+          fi
+
+          file_name="$(basename "$installer_path")"
+          blob_path="${APP_ID}/releases/${TAG}/${file_name}"
+          source_path="$(realpath "$installer_path")"
+          url="${PUBLIC_BASE_URL}/${blob_path}"
+          content_type="$(content_type_for "$file_name")"
+          platform="$(platform_for "$file_name")"
+
+          if [[ "$platform" == 'unknown' ]]; then
+            echo "Unsupported installer type: $installer_path" >&2
+            exit 1
+          fi
+
+          azcopy_upload "$source_path" "$(append_sas_token "$url")" "$content_type"
+
+          sha256="$(sha256sum "$installer_path" | awk '{print $1}')"
+          size_bytes="$(wc -c < "$installer_path" | tr -d '[:space:]')"
+
+          python3 - "$assets_jsonl" "$platform" "$file_name" "$blob_path" "$url" "$sha256" "$size_bytes" "$content_type" <<'PY'
+        import json
+        import sys
+
+        path, platform, file_name, blob_path, url, sha256, size_bytes, content_type = sys.argv[1:]
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps({
+                "platform": platform,
+                "fileName": file_name,
+                "path": blob_path,
+                "url": url,
+                "sha256": sha256,
+                "sizeBytes": int(size_bytes),
+                "contentType": content_type,
+            }, separators=(",", ":")) + "\n")
+        PY
+        done <<< "$INSTALLER_PATHS"
+
+        python3 - "$assets_jsonl" "$latest_json" "$APP_ID" "$VERSION" "$TAG" <<'PY'
+        import datetime
+        import json
+        import sys
+
+        assets_path, latest_path, app_id, version, tag = sys.argv[1:]
+        files = {}
+
+        with open(assets_path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+
+                asset = json.loads(line)
+                platform = asset.pop("platform")
+                files[platform] = asset
+
+        manifest = {
+            "appId": app_id,
+            "version": version,
+            "tag": tag,
+            "publishedAt": datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "files": files,
+        }
+
+        with open(latest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle, indent=2)
+            handle.write("\n")
+        PY
+
+        latest_url="$(append_sas_token "${PUBLIC_BASE_URL}/${APP_ID}/latest.json")"
+        azcopy_upload "$latest_json" "$latest_url" 'application/json'
+
+        upload_updater_files() {
+          local manifests_only="$1"
+
+          while IFS= read -r updater_path; do
+            if [[ -z "$updater_path" ]]; then
+              continue
+            fi
+
+            file_name="$(basename "$updater_path")"
+            is_manifest=false
+            if [[ "$file_name" == 'latest.yml' || "$file_name" == 'latest-mac.yml' ]]; then
+              is_manifest=true
+            fi
+
+            if [[ "$manifests_only" != "$is_manifest" ]]; then
+              continue
+            fi
+
+            if [[ ! -f "$updater_path" ]]; then
+              echo "Updater file not found: $updater_path" >&2
+              exit 1
+            fi
+
+            source_path="$(realpath "$updater_path")"
+            destination_url="$(append_sas_token "${PUBLIC_BASE_URL}/${APP_ID}/${file_name}")"
+            azcopy_upload "$source_path" "$destination_url" "$(content_type_for "$file_name")"
+          done <<< "$UPDATER_PATHS"
+        }
+
+        upload_updater_files false
+        upload_updater_files true

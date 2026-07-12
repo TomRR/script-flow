@@ -11,13 +11,14 @@ on:
         required: false
         type: string
       publish_mode:
-        description: Whether to publish a GitHub release or only build artifacts
+        description: Whether to build internally, publish Azure-only, or publish the one-time GitHub bridge
         required: true
         default: internal
         type: choice
         options:
           - internal
           - release
+          - bridge
       ref:
         description: Git ref to build for manual runs
         required: false
@@ -42,8 +43,8 @@ jobs:
       is_internal: ${{ steps.release_meta.outputs.is_internal }}
       is_prerelease: ${{ steps.release_meta.outputs.is_prerelease }}
       make_latest: ${{ steps.release_meta.outputs.make_latest }}
+      is_bridge: ${{ steps.release_meta.outputs.is_bridge }}
       ref: ${{ steps.release_meta.outputs.ref }}
-      previous_tag: ${{ steps.previous_tag.outputs.previous_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -79,7 +80,7 @@ jobs:
             PUBLISH_MODE="${{ github.event.inputs.publish_mode }}"
             PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-            if [[ "$PUBLISH_MODE" == "release" ]]; then
+            if [[ "$PUBLISH_MODE" == "release" || "$PUBLISH_MODE" == "bridge" ]]; then
               if [[ -z "$VERSION_INPUT" ]]; then
                 echo "workflow_dispatch releases require the version input." >&2
                 exit 1
@@ -89,17 +90,24 @@ jobs:
               TAG="v$VERSION"
               RELEASE_NAME="ScriptFlow v$VERSION"
               IS_INTERNAL=false
+              if [[ "$PUBLISH_MODE" == "bridge" ]]; then
+                IS_BRIDGE=true
+              else
+                IS_BRIDGE=false
+              fi
             else
               VERSION="${VERSION_INPUT:-$PACKAGE_VERSION}"
               TAG=""
               RELEASE_NAME="ScriptFlow internal $VERSION"
               IS_INTERNAL=true
+              IS_BRIDGE=false
             fi
           else
             VERSION=${GITHUB_REF_NAME#v}
             TAG="$GITHUB_REF_NAME"
             RELEASE_NAME="ScriptFlow v$VERSION"
             IS_INTERNAL=false
+            IS_BRIDGE=false
           fi
 
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
@@ -121,7 +129,38 @@ jobs:
           echo "is_internal=$IS_INTERNAL" >> "$GITHUB_OUTPUT"
           echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "make_latest=$MAKE_LATEST" >> "$GITHUB_OUTPUT"
+          echo "is_bridge=$IS_BRIDGE" >> "$GITHUB_OUTPUT"
           echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Azure release configuration
+        if: steps.release_meta.outputs.is_internal == 'false'
+        shell: bash
+        env:
+          AZURE_INSTALLER_STORAGE_ACCOUNT: ${{ vars.AZURE_INSTALLER_STORAGE_ACCOUNT }}
+          AZURE_INSTALLER_CONTAINER_NAME: ${{ vars.AZURE_INSTALLER_CONTAINER_NAME }}
+          AZURE_INSTALLER_PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
+          AZURE_INSTALLER_SAS_TOKEN: ${{ secrets.AZURE_INSTALLER_SAS_TOKEN }}
+        run: |
+          if [[ -z "$AZURE_INSTALLER_STORAGE_ACCOUNT" ]]; then
+            echo 'Missing required GitHub variable: AZURE_INSTALLER_STORAGE_ACCOUNT' >&2
+            exit 1
+          fi
+          if [[ -z "$AZURE_INSTALLER_CONTAINER_NAME" ]]; then
+            echo 'Missing required GitHub variable: AZURE_INSTALLER_CONTAINER_NAME' >&2
+            exit 1
+          fi
+          if [[ -z "$AZURE_INSTALLER_PUBLIC_BASE_URL" ]]; then
+            echo 'Missing required GitHub variable: AZURE_INSTALLER_PUBLIC_BASE_URL' >&2
+            exit 1
+          fi
+          if [[ ! "$AZURE_INSTALLER_PUBLIC_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]]; then
+            echo 'AZURE_INSTALLER_PUBLIC_BASE_URL must be an HTTPS URL.' >&2
+            exit 1
+          fi
+          if [[ -z "$AZURE_INSTALLER_SAS_TOKEN" ]]; then
+            echo 'Missing required GitHub secret: AZURE_INSTALLER_SAS_TOKEN' >&2
+            exit 1
+          fi
 
       - name: Format
         run: bun run fmt:check
@@ -134,20 +173,6 @@ jobs:
 
       - name: Test
         run: bun run test
-
-      - id: previous_tag
-        name: Resolve previous release tag
-        if: steps.release_meta.outputs.is_internal == 'false'
-        shell: bash
-        run: |
-          CURRENT_TAG="${{ steps.release_meta.outputs.tag }}"
-          PREVIOUS_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | grep -v "^${CURRENT_TAG}$" | head -n 1)
-          echo "previous_tag=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
-          if [[ -n "$PREVIOUS_TAG" ]]; then
-            echo "Previous release tag: $PREVIOUS_TAG"
-          else
-            echo "No previous release tag found (first release)."
-          fi
 
   build:
     name: Build (${{ matrix.label }})
@@ -208,7 +233,7 @@ jobs:
       - name: Build & Package
         shell: bash
         env:
-          SCRIPTFLOW_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          AZURE_INSTALLER_PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -231,14 +256,14 @@ jobs:
           path: |
             scriptflow-electron/release-assets/*
           if-no-files-found: error
-          retention-days: ${{ needs.preflight.outputs.is_internal == 'true' && 1 || 5 }}
+          retention-days: 1
 
   publish-release:
     name: Publish GitHub Release
     needs: [preflight, build]
     if: ${{ !failure() && !cancelled() && needs.preflight.outputs.is_internal == 'false' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
@@ -276,48 +301,88 @@ jobs:
             fi
           done
 
-      - name: Publish GitHub Release (with previous tag)
-        if: needs.preflight.outputs.previous_tag != ''
+      - name: Validate release artifacts and updater metadata
+        shell: bash
+        run: |
+          VERSION="${{ needs.preflight.outputs.version }}"
+          required_files=(
+            "release-assets/ScriptFlow-${VERSION}-mac-arm64.dmg"
+            "release-assets/ScriptFlow-${VERSION}-mac-arm64.zip"
+            "release-assets/ScriptFlow-${VERSION}-mac-arm64.zip.blockmap"
+            "release-assets/ScriptFlow-${VERSION}-win-x64.exe"
+            "release-assets/ScriptFlow-${VERSION}-win-x64.exe.blockmap"
+            "release-assets/ScriptFlow-${VERSION}-linux-x64.AppImage"
+            'release-assets/latest.yml'
+            'release-assets/latest-mac.yml'
+          )
+
+          for required_file in "${required_files[@]}"; do
+            if [[ ! -f "$required_file" ]]; then
+              echo "Missing required release file: $required_file" >&2
+              exit 1
+            fi
+          done
+
+      - name: Create placeholder GitHub Release
+        if: needs.preflight.outputs.is_bridge == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.preflight.outputs.tag }}
           target_commitish: ${{ needs.preflight.outputs.ref }}
           name: ${{ needs.preflight.outputs.release_name }}
-          generate_release_notes: true
-          previous_tag: ${{ needs.preflight.outputs.previous_tag }}
           prerelease: ${{ needs.preflight.outputs.is_prerelease }}
           make_latest: ${{ needs.preflight.outputs.make_latest }}
+          body: |
+            Installer downloads are now available on the website:
+            https://...
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create one-time bridge GitHub Release
+        if: needs.preflight.outputs.is_bridge == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.preflight.outputs.tag }}
+          target_commitish: ${{ needs.preflight.outputs.ref }}
+          name: ${{ needs.preflight.outputs.release_name }}
+          prerelease: ${{ needs.preflight.outputs.is_prerelease }}
+          make_latest: ${{ needs.preflight.outputs.make_latest }}
+          body: |
+            Installer downloads are now available on the website:
+            https://...
           files: |
             scriptflow-electron/release-assets/*.dmg
             scriptflow-electron/release-assets/*.zip
             scriptflow-electron/release-assets/*.exe
             scriptflow-electron/release-assets/*.AppImage
             scriptflow-electron/release-assets/*.blockmap
-            scriptflow-electron/release-assets/*.yml
+            scriptflow-electron/release-assets/latest.yml
+            scriptflow-electron/release-assets/latest-mac.yml
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish GitHub Release (first release)
-        if: needs.preflight.outputs.previous_tag == ''
-        uses: softprops/action-gh-release@v2
+      - name: Upload release artifacts to Azure Storage
+        uses: ./.github/actions/upload_azure_release_installers
         with:
-          tag_name: ${{ needs.preflight.outputs.tag }}
-          target_commitish: ${{ needs.preflight.outputs.ref }}
-          name: ${{ needs.preflight.outputs.release_name }}
-          generate_release_notes: true
-          prerelease: ${{ needs.preflight.outputs.is_prerelease }}
-          make_latest: ${{ needs.preflight.outputs.make_latest }}
-          files: |
-            scriptflow-electron/release-assets/*.dmg
-            scriptflow-electron/release-assets/*.zip
-            scriptflow-electron/release-assets/*.exe
-            scriptflow-electron/release-assets/*.AppImage
-            scriptflow-electron/release-assets/*.blockmap
-            scriptflow-electron/release-assets/*.yml
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          app_id: script-flow
+          version: ${{ needs.preflight.outputs.version }}
+          tag: ${{ needs.preflight.outputs.tag }}
+          storage_account: ${{ vars.AZURE_INSTALLER_STORAGE_ACCOUNT }}
+          container_name: ${{ vars.AZURE_INSTALLER_CONTAINER_NAME }}
+          sas_token: ${{ secrets.AZURE_INSTALLER_SAS_TOKEN }}
+          public_base_url: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
+          installer_paths: |
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-mac-arm64.dmg
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-win-x64.exe
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-linux-x64.AppImage
+          updater_paths: |
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-mac-arm64.zip
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-mac-arm64.zip.blockmap
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-win-x64.exe
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-win-x64.exe.blockmap
+            ./scriptflow-electron/release-assets/latest.yml
+            ./scriptflow-electron/release-assets/latest-mac.yml
 
   finalize:
     name: Finalize Release

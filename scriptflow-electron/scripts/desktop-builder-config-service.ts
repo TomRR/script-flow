@@ -16,11 +16,9 @@ export interface BuildDesktopArtifactOptions {
     skipBuild: boolean
 }
 
-interface GitHubPublishConfig {
-    provider: 'github'
-    owner: string
-    repo: string
-    releaseType: 'release' | 'prerelease'
+interface GenericPublishConfig {
+    provider: 'generic'
+    url: string
 }
 
 interface AzureSignOptions {
@@ -38,23 +36,35 @@ export class DesktopBuilderConfigService {
         return `ScriptFlow-\${version}-${platformValue}-\${arch}.\${ext}`
     }
 
-    static resolveGitHubPublishConfig(version: string): GitHubPublishConfig | undefined {
-        const rawRepository =
-            process.env.SCRIPTFLOW_DESKTOP_UPDATE_REPOSITORY?.trim() || process.env.GITHUB_REPOSITORY?.trim() || ''
-        if (!rawRepository) {
+    static resolveAzurePublishConfig(environment: NodeJS.ProcessEnv = process.env): GenericPublishConfig | undefined {
+        const rawPublicBaseUrl = environment.AZURE_INSTALLER_PUBLIC_BASE_URL?.trim() ?? ''
+        if (!rawPublicBaseUrl) {
             return undefined
         }
 
-        const [owner, repo, ...rest] = rawRepository.split('/')
-        if (!owner || !repo || rest.length > 0) {
-            return undefined
+        let publicBaseUrl: URL
+        try {
+            publicBaseUrl = new URL(rawPublicBaseUrl)
+        } catch {
+            throw new Error('AZURE_INSTALLER_PUBLIC_BASE_URL must be a valid HTTPS URL.')
         }
+
+        if (
+            publicBaseUrl.protocol !== 'https:' ||
+            !publicBaseUrl.hostname ||
+            publicBaseUrl.username ||
+            publicBaseUrl.password ||
+            publicBaseUrl.search ||
+            publicBaseUrl.hash
+        ) {
+            throw new Error('AZURE_INSTALLER_PUBLIC_BASE_URL must be a valid HTTPS URL.')
+        }
+
+        const normalizedBaseUrl = publicBaseUrl.toString().replace(/\/+$/, '')
 
         return {
-            provider: 'github',
-            owner,
-            repo,
-            releaseType: version.includes('-') ? 'prerelease' : 'release',
+            provider: 'generic',
+            url: `${normalizedBaseUrl}/script-flow`,
         }
     }
 
@@ -100,7 +110,7 @@ export class DesktopBuilderConfigService {
         options: BuildDesktopArtifactOptions,
         environment: NodeJS.ProcessEnv,
     ): Record<string, unknown> {
-        const publishConfig = DesktopBuilderConfigService.resolveGitHubPublishConfig(options.buildVersion!)
+        const publishConfig = DesktopBuilderConfigService.resolveAzurePublishConfig(environment)
         const builderConfig: Record<string, unknown> = {
             appId: AppIdentityService.getAppId(),
             productName: AppIdentityService.getProductName(),
