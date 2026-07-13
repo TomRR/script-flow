@@ -31,7 +31,7 @@ describe('DesktopBuilderConfigService', () => {
         expect(config.publish).toEqual([
             {
                 provider: 'generic',
-                url: 'https://downloads.example.com/installers/script-flow',
+                url: 'https://downloads.example.com/installers/script-flow/updates',
             },
         ])
     })
@@ -43,7 +43,7 @@ describe('DesktopBuilderConfigService', () => {
             }),
         ).toEqual({
             provider: 'generic',
-            url: 'https://downloads.example.com/installers/script-flow',
+            url: 'https://downloads.example.com/installers/script-flow/updates',
         })
     })
 

@@ -1,5 +1,5 @@
 name: 'Upload Azure release artifacts'
-description: 'Upload installers, updater files, and a latest.json manifest to Azure Blob Storage.'
+description: 'Upload versioned installers, a prefixed updater feed, and a latest.json manifest to Azure Blob Storage.'
 
 inputs:
   app_id:
@@ -24,9 +24,13 @@ inputs:
     description: 'Newline-separated installer paths to upload to the versioned release directory.'
     required: true
   updater_paths:
-    description: 'Newline-separated updater payload and manifest paths to publish at the app root.'
+    description: 'Newline-separated updater payload and manifest paths to publish below updater_prefix.'
     required: false
     default: ''
+  updater_prefix:
+    description: 'Blob path below the app root used for updater payloads and manifests.'
+    required: false
+    default: 'updates'
   public_base_url:
     description: 'Optional public container URL. Defaults to the storage account blob endpoint plus container.'
     required: false
@@ -54,6 +58,7 @@ runs:
         SAS_TOKEN: ${{ inputs.sas_token }}
         INSTALLER_PATHS: ${{ inputs.installer_paths }}
         UPDATER_PATHS: ${{ inputs.updater_paths }}
+        UPDATER_PREFIX: ${{ inputs.updater_prefix }}
         PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
         AZCOPY_VERSION: ${{ inputs.azcopy_version }}
         AZCOPY_SHA256: ${{ inputs.azcopy_sha256 }}
@@ -65,9 +70,16 @@ runs:
         fi
 
         PUBLIC_BASE_URL="${PUBLIC_BASE_URL%/}"
+        UPDATER_PREFIX="${UPDATER_PREFIX#/}"
+        UPDATER_PREFIX="${UPDATER_PREFIX%/}"
 
         if [[ ! "$PUBLIC_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]]; then
           echo 'AZURE_INSTALLER_PUBLIC_BASE_URL must be an HTTPS URL.' >&2
+          exit 1
+        fi
+
+        if [[ -z "$UPDATER_PREFIX" || "$UPDATER_PREFIX" == *'..'* || "$UPDATER_PREFIX" == *'?'* || "$UPDATER_PREFIX" == *'#'* ]]; then
+          echo 'updater_prefix must be a safe, non-empty relative blob path.' >&2
           exit 1
         fi
 
@@ -93,6 +105,9 @@ runs:
         fi
 
         chmod +x "$azcopy_executable"
+
+        mapfile -t installer_paths <<< "$INSTALLER_PATHS"
+        mapfile -t updater_paths <<< "$UPDATER_PATHS"
 
         append_sas_token() {
           local url="$1"
@@ -153,10 +168,13 @@ runs:
           local destination_url="$2"
           local content_type="$3"
 
-          "$azcopy_executable" copy "$source_path" "$destination_url" --overwrite=true --content-type "$content_type"
+          "$azcopy_executable" copy "$source_path" "$destination_url" --overwrite=true --content-type "$content_type" </dev/null
         }
 
-        while IFS= read -r installer_path; do
+        declare -A installer_platform_counts=()
+        installer_count=0
+
+        for installer_path in "${installer_paths[@]}"; do
           if [[ -z "$installer_path" ]]; then
             continue
           fi
@@ -177,6 +195,91 @@ runs:
             echo "Unsupported installer type: $installer_path" >&2
             exit 1
           fi
+
+          installer_platform_counts["$platform"]=$(( ${installer_platform_counts["$platform"]:-0} + 1 ))
+          installer_count=$((installer_count + 1))
+        done
+
+        for expected_platform in macos windows linux; do
+          if [[ "${installer_platform_counts["$expected_platform"]:-0}" -ne 1 ]]; then
+            echo "Expected exactly one ${expected_platform} installer." >&2
+            exit 1
+          fi
+        done
+
+        if [[ "$installer_count" -ne 3 ]]; then
+          echo "Expected exactly three installers, got $installer_count." >&2
+          exit 1
+        fi
+
+        declare -A updater_file_counts=()
+        updater_count=0
+
+        for updater_path in "${updater_paths[@]}"; do
+          if [[ -z "$updater_path" ]]; then
+            continue
+          fi
+
+          if [[ ! -f "$updater_path" ]]; then
+            echo "Updater file not found: $updater_path" >&2
+            exit 1
+          fi
+
+          file_name="$(basename "$updater_path")"
+          case "${file_name,,}" in
+            latest.yml)
+              updater_kind='latest.yml'
+              ;;
+            latest-mac.yml)
+              updater_kind='latest-mac.yml'
+              ;;
+            *.zip.blockmap)
+              updater_kind='zip.blockmap'
+              ;;
+            *.zip)
+              updater_kind='zip'
+              ;;
+            *.exe.blockmap)
+              updater_kind='exe.blockmap'
+              ;;
+            *.exe)
+              updater_kind='exe'
+              ;;
+            *)
+              echo "Unsupported updater file: $updater_path" >&2
+              exit 1
+              ;;
+          esac
+
+          updater_file_counts["$updater_kind"]=$(( ${updater_file_counts["$updater_kind"]:-0} + 1 ))
+          updater_count=$((updater_count + 1))
+        done
+
+        if [[ "$updater_count" -gt 0 ]]; then
+          for expected_updater_kind in latest.yml latest-mac.yml zip zip.blockmap exe exe.blockmap; do
+            if [[ "${updater_file_counts["$expected_updater_kind"]:-0}" -ne 1 ]]; then
+              echo "Expected exactly one ${expected_updater_kind} updater file." >&2
+              exit 1
+            fi
+          done
+
+          if [[ "$updater_count" -ne 6 ]]; then
+            echo "Expected exactly six updater files, got $updater_count." >&2
+            exit 1
+          fi
+        fi
+
+        for installer_path in "${installer_paths[@]}"; do
+          if [[ -z "$installer_path" ]]; then
+            continue
+          fi
+
+          file_name="$(basename "$installer_path")"
+          blob_path="${APP_ID}/releases/${TAG}/${file_name}"
+          source_path="$(realpath "$installer_path")"
+          url="${PUBLIC_BASE_URL}/${blob_path}"
+          content_type="$(content_type_for "$file_name")"
+          platform="$(platform_for "$file_name")"
 
           azcopy_upload "$source_path" "$(append_sas_token "$url")" "$content_type"
 
@@ -199,7 +302,7 @@ runs:
                 "contentType": content_type,
             }, separators=(",", ":")) + "\n")
         PY
-        done <<< "$INSTALLER_PATHS"
+        done
 
         python3 - "$assets_jsonl" "$latest_json" "$APP_ID" "$VERSION" "$TAG" <<'PY'
         import datetime
@@ -216,7 +319,13 @@ runs:
 
                 asset = json.loads(line)
                 platform = asset.pop("platform")
+                if platform in files:
+                    raise RuntimeError(f"Duplicate installer platform: {platform}")
                 files[platform] = asset
+
+        expected_platforms = {"macos", "windows", "linux"}
+        if set(files) != expected_platforms:
+            raise RuntimeError(f"Expected installers for {sorted(expected_platforms)}, got {sorted(files)}")
 
         manifest = {
             "appId": app_id,
@@ -237,7 +346,7 @@ runs:
         upload_updater_files() {
           local manifests_only="$1"
 
-          while IFS= read -r updater_path; do
+          for updater_path in "${updater_paths[@]}"; do
             if [[ -z "$updater_path" ]]; then
               continue
             fi
@@ -252,15 +361,10 @@ runs:
               continue
             fi
 
-            if [[ ! -f "$updater_path" ]]; then
-              echo "Updater file not found: $updater_path" >&2
-              exit 1
-            fi
-
             source_path="$(realpath "$updater_path")"
-            destination_url="$(append_sas_token "${PUBLIC_BASE_URL}/${APP_ID}/${file_name}")"
+            destination_url="$(append_sas_token "${PUBLIC_BASE_URL}/${APP_ID}/${UPDATER_PREFIX}/${file_name}")"
             azcopy_upload "$source_path" "$destination_url" "$(content_type_for "$file_name")"
-          done <<< "$UPDATER_PATHS"
+          done
         }
 
         upload_updater_files false

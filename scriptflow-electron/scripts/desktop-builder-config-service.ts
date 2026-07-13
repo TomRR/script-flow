@@ -64,7 +64,7 @@ export class DesktopBuilderConfigService {
 
         return {
             provider: 'generic',
-            url: `${normalizedBaseUrl}/script-flow`,
+            url: `${normalizedBaseUrl}/script-flow/updates`,
         }
     }
 

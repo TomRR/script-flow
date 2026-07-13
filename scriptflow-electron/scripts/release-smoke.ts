@@ -133,6 +133,26 @@ assert(
     azureAction.includes('${PUBLIC_BASE_URL}/${APP_ID}/latest.json'),
     'The website manifest must be published at the app root.',
 )
+assert(azureAction.includes("default: 'updates'"), 'The updater prefix must default to updates.')
+assert(azureAction.includes('mapfile -t installer_paths'), 'Installer paths must be isolated from child stdin.')
+assert(azureAction.includes('mapfile -t updater_paths'), 'Updater paths must be isolated from child stdin.')
+assert(azureAction.includes('</dev/null'), 'AzCopy must not consume release path input.')
+assert(
+    azureAction.includes('expected_platforms = {"macos", "windows", "linux"}'),
+    'The website manifest must require all supported installer platforms.',
+)
+for (const updaterKind of ['latest.yml', 'latest-mac.yml', 'zip', 'zip.blockmap', 'exe', 'exe.blockmap']) {
+    assert(
+        azureAction.includes(`Expected exactly one \${expected_updater_kind} updater file.`) &&
+            azureAction.includes(updaterKind),
+        `The Azure action must reject an incomplete ${updaterKind} updater set.`,
+    )
+}
+assert(azureAction.includes('Expected exactly six updater files'), 'The updater feed must contain exactly six files.')
+assert(
+    azureAction.includes('${APP_ID}/${UPDATER_PREFIX}/${file_name}'),
+    'Updater files must use the dedicated updater prefix.',
+)
 assert(
     azureAction.indexOf('upload_updater_files false') < azureAction.indexOf('upload_updater_files true'),
     'Updater payloads must be uploaded before updater manifests.',
@@ -144,8 +164,12 @@ assert(
     builderConfigService.includes('environment.AZURE_INSTALLER_PUBLIC_BASE_URL'),
     'The generic updater must use the shared public Azure URL.',
 )
-assert(builderConfigService.includes('/script-flow`'), 'The updater URL must use the script-flow app root.')
+assert(builderConfigService.includes('/script-flow/updates`'), 'The updater URL must use the updates prefix.')
 assert(!builderConfigService.includes("provider: 'github'"), 'Packaged apps must no longer use the GitHub updater.')
+assert(
+    releaseWorkflow.includes('Verify public Azure release files'),
+    'Published release files must be checked through their anonymous URLs.',
+)
 console.log('✓ Placeholder releases, Azure uploads, and the generic updater are configured correctly.')
 
 console.log('\nRelease smoke checks passed.')
