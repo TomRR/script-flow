@@ -116,9 +116,14 @@ for (const requiredArtifact of [
     'ScriptFlow-${VERSION}-linux-x64.AppImage',
     "'release-assets/latest.yml'",
     "'release-assets/latest-mac.yml'",
+    "'release-assets/latest-linux.yml'",
 ]) {
     assert(releaseWorkflow.includes(requiredArtifact), `Release validation must require ${requiredArtifact}.`)
 }
+assert(
+    countOccurrences(releaseWorkflow, 'linux-x64.AppImage') >= 3,
+    'The Linux AppImage must be validated and published to both releases and updates.',
+)
 assert(!releaseWorkflow.includes('AZCOPY_IMAGE'), 'The superseded Docker-based AzCopy configuration must be removed.')
 assert(!releaseWorkflow.includes('AZURE_STORAGE_ACCOUNT_URL'), 'The superseded Azure account secret must be removed.')
 assert(!releaseWorkflow.includes('AZURE_STORAGE_SAS_TOKEN'), 'The superseded Azure SAS secret must be removed.')
@@ -159,14 +164,26 @@ assert(
     'The Azure action must reject incomplete or duplicate platform installer sets.',
 )
 assert(azureAction.includes('Expected exactly three installers'), 'The installer set must contain exactly three files.')
-for (const updaterKind of ['latest.yml', 'latest-mac.yml', 'zip', 'zip.blockmap', 'exe', 'exe.blockmap']) {
+for (const updaterKind of [
+    'latest.yml',
+    'latest-mac.yml',
+    'latest-linux.yml',
+    'zip',
+    'zip.blockmap',
+    'exe',
+    'exe.blockmap',
+    'appimage',
+]) {
     assert(
         azureAction.includes(`Expected exactly one \${expected_updater_kind} updater file.`) &&
             azureAction.includes(updaterKind),
         `The Azure action must reject an incomplete ${updaterKind} updater set.`,
     )
 }
-assert(azureAction.includes('Expected exactly six updater files'), 'The updater feed must contain exactly six files.')
+assert(
+    azureAction.includes('Expected exactly eight updater files'),
+    'The updater feed must contain exactly eight files.',
+)
 assert(!azureAction.includes('if [[ "$updater_count" -gt 0 ]]'), 'An empty updater set must be rejected as incomplete.')
 assert(
     azureAction.includes('${STORAGE_BASE_URL}/${APP_ID}/${UPDATER_PREFIX}/${file_name}'),
@@ -175,6 +192,10 @@ assert(
 assert(
     azureAction.indexOf('upload_updater_files false') < azureAction.indexOf('upload_updater_files true'),
     'Updater payloads must be uploaded before updater manifests.',
+)
+assert(
+    azureAction.includes('|| "$file_name" == \'latest-linux.yml\''),
+    'The Linux updater manifest must be published after its AppImage payload.',
 )
 assert(!azureAction.includes('docker run'), 'The Azure upload action must not depend on Docker.')
 assert(azureAction.includes('verify_remote_blob()'), 'The Azure action must verify uploaded blobs remotely.')
@@ -192,7 +213,7 @@ assert(
 )
 assert(
     azureAction.includes('verify_remote_blob "$updater_path" "${APP_ID}/${UPDATER_PREFIX}/${file_name}"'),
-    'All six validated updater files must be verified after upload.',
+    'All eight validated updater files must be verified after upload.',
 )
 assert(
     azureAction.includes('verify_remote_blob "$latest_json" "${APP_ID}/latest.json"'),

@@ -318,6 +318,7 @@ jobs:
             "release-assets/ScriptFlow-${VERSION}-linux-x64.AppImage"
             'release-assets/latest.yml'
             'release-assets/latest-mac.yml'
+            'release-assets/latest-linux.yml'
           )
 
           for required_file in "${required_files[@]}"; do
@@ -362,6 +363,7 @@ jobs:
             scriptflow-electron/release-assets/*.blockmap
             scriptflow-electron/release-assets/latest.yml
             scriptflow-electron/release-assets/latest-mac.yml
+            scriptflow-electron/release-assets/latest-linux.yml
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -385,8 +387,10 @@ jobs:
             ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-mac-arm64.zip.blockmap
             ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-win-x64.exe
             ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-win-x64.exe.blockmap
+            ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-linux-x64.AppImage
             ./scriptflow-electron/release-assets/latest.yml
             ./scriptflow-electron/release-assets/latest-mac.yml
+            ./scriptflow-electron/release-assets/latest-linux.yml
           updater_prefix: updates
 
   finalize:

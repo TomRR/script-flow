@@ -226,6 +226,9 @@ runs:
             latest-mac.yml)
               updater_kind='latest-mac.yml'
               ;;
+            latest-linux.yml)
+              updater_kind='latest-linux.yml'
+              ;;
             *.zip.blockmap)
               updater_kind='zip.blockmap'
               ;;
@@ -238,6 +241,9 @@ runs:
             *.exe)
               updater_kind='exe'
               ;;
+            *.appimage)
+              updater_kind='appimage'
+              ;;
             *)
               echo "Unsupported updater file: $updater_path" >&2
               exit 1
@@ -248,15 +254,15 @@ runs:
           updater_count=$((updater_count + 1))
         done
 
-        for expected_updater_kind in latest.yml latest-mac.yml zip zip.blockmap exe exe.blockmap; do
+        for expected_updater_kind in latest.yml latest-mac.yml latest-linux.yml zip zip.blockmap exe exe.blockmap appimage; do
           if [[ "${updater_file_counts["$expected_updater_kind"]:-0}" -ne 1 ]]; then
             echo "Expected exactly one ${expected_updater_kind} updater file." >&2
             exit 1
           fi
         done
 
-        if [[ "$updater_count" -ne 6 ]]; then
-          echo "Expected exactly six updater files, got $updater_count." >&2
+        if [[ "$updater_count" -ne 8 ]]; then
+          echo "Expected exactly eight updater files, got $updater_count." >&2
           exit 1
         fi
 
@@ -344,7 +350,7 @@ runs:
 
             file_name="$(basename "$updater_path")"
             is_manifest=false
-            if [[ "$file_name" == 'latest.yml' || "$file_name" == 'latest-mac.yml' ]]; then
+            if [[ "$file_name" == 'latest.yml' || "$file_name" == 'latest-mac.yml' || "$file_name" == 'latest-linux.yml' ]]; then
               is_manifest=true
             fi
 
