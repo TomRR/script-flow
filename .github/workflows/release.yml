@@ -138,7 +138,7 @@ jobs:
         env:
           AZURE_INSTALLER_STORAGE_ACCOUNT: ${{ vars.AZURE_INSTALLER_STORAGE_ACCOUNT }}
           AZURE_INSTALLER_CONTAINER_NAME: ${{ vars.AZURE_INSTALLER_CONTAINER_NAME }}
-          AZURE_INSTALLER_PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
+          RELEASE_API_BASE_URL: ${{ vars.RELEASE_API_BASE_URL }}
           AZURE_INSTALLER_SAS_TOKEN: ${{ secrets.AZURE_INSTALLER_SAS_TOKEN }}
         run: |
           if [[ -z "$AZURE_INSTALLER_STORAGE_ACCOUNT" ]]; then
@@ -149,12 +149,13 @@ jobs:
             echo 'Missing required GitHub variable: AZURE_INSTALLER_CONTAINER_NAME' >&2
             exit 1
           fi
-          if [[ -z "$AZURE_INSTALLER_PUBLIC_BASE_URL" ]]; then
-            echo 'Missing required GitHub variable: AZURE_INSTALLER_PUBLIC_BASE_URL' >&2
+          if [[ -z "$RELEASE_API_BASE_URL" ]]; then
+            echo 'Missing required GitHub variable: RELEASE_API_BASE_URL' >&2
             exit 1
           fi
-          if [[ ! "$AZURE_INSTALLER_PUBLIC_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]]; then
-            echo 'AZURE_INSTALLER_PUBLIC_BASE_URL must be an HTTPS URL.' >&2
+          if [[ ! "$RELEASE_API_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]] || \
+            [[ "$RELEASE_API_BASE_URL" == *'?'* || "$RELEASE_API_BASE_URL" == *'#'* || "$RELEASE_API_BASE_URL" == *'@'* ]]; then
+            echo 'RELEASE_API_BASE_URL must be an HTTPS URL.' >&2
             exit 1
           fi
           if [[ -z "$AZURE_INSTALLER_SAS_TOKEN" ]]; then
@@ -236,7 +237,7 @@ jobs:
       - name: Build & Package
         shell: bash
         env:
-          AZURE_INSTALLER_PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
+          RELEASE_API_BASE_URL: ${{ vars.RELEASE_API_BASE_URL }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -374,7 +375,7 @@ jobs:
           storage_account: ${{ vars.AZURE_INSTALLER_STORAGE_ACCOUNT }}
           container_name: ${{ vars.AZURE_INSTALLER_CONTAINER_NAME }}
           sas_token: ${{ secrets.AZURE_INSTALLER_SAS_TOKEN }}
-          public_base_url: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
+          download_base_url: ${{ vars.RELEASE_API_BASE_URL }}
           installer_paths: |
             ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-mac-arm64.dmg
             ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-win-x64.exe
@@ -387,60 +388,6 @@ jobs:
             ./scriptflow-electron/release-assets/latest.yml
             ./scriptflow-electron/release-assets/latest-mac.yml
           updater_prefix: updates
-
-      - name: Verify public Azure release files
-        shell: bash
-        env:
-          PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
-          VERSION: ${{ needs.preflight.outputs.version }}
-          TAG: ${{ needs.preflight.outputs.tag }}
-        run: |
-          set -euo pipefail
-
-          PUBLIC_BASE_URL="${PUBLIC_BASE_URL%/}"
-          APP_BASE_URL="${PUBLIC_BASE_URL}/script-flow"
-          latest_json="${RUNNER_TEMP}/script-flow-latest.json"
-
-          curl --fail --silent --show-error --location --retry 4 --retry-all-errors --retry-delay 3 \
-            "${APP_BASE_URL}/latest.json" --output "$latest_json"
-
-          python3 - "$latest_json" "$VERSION" "$TAG" <<'PY'
-          import json
-          import sys
-
-          path, version, tag = sys.argv[1:]
-          with open(path, encoding="utf-8") as handle:
-              manifest = json.load(handle)
-
-          if manifest.get("version") != version:
-              raise RuntimeError(f"Expected version {version}, got {manifest.get('version')}")
-          if manifest.get("tag") != tag:
-              raise RuntimeError(f"Expected tag {tag}, got {manifest.get('tag')}")
-
-          expected_platforms = {"macos", "windows", "linux"}
-          actual_platforms = set(manifest.get("files", {}))
-          if actual_platforms != expected_platforms:
-              raise RuntimeError(
-                  f"Expected installers for {sorted(expected_platforms)}, got {sorted(actual_platforms)}"
-              )
-          PY
-
-          public_files=(
-            "releases/${TAG}/ScriptFlow-${VERSION}-mac-arm64.dmg"
-            "releases/${TAG}/ScriptFlow-${VERSION}-win-x64.exe"
-            "releases/${TAG}/ScriptFlow-${VERSION}-linux-x64.AppImage"
-            "updates/ScriptFlow-${VERSION}-mac-arm64.zip"
-            "updates/ScriptFlow-${VERSION}-mac-arm64.zip.blockmap"
-            "updates/ScriptFlow-${VERSION}-win-x64.exe"
-            "updates/ScriptFlow-${VERSION}-win-x64.exe.blockmap"
-            'updates/latest.yml'
-            'updates/latest-mac.yml'
-          )
-
-          for public_file in "${public_files[@]}"; do
-            curl --fail --silent --show-error --location --retry 4 --retry-all-errors --retry-delay 3 \
-              --head "${APP_BASE_URL}/${public_file}" --output /dev/null
-          done
 
   finalize:
     name: Finalize Release

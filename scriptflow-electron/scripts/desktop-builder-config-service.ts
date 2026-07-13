@@ -37,30 +37,30 @@ export class DesktopBuilderConfigService {
     }
 
     static resolveAzurePublishConfig(environment: NodeJS.ProcessEnv = process.env): GenericPublishConfig | undefined {
-        const rawPublicBaseUrl = environment.AZURE_INSTALLER_PUBLIC_BASE_URL?.trim() ?? ''
-        if (!rawPublicBaseUrl) {
+        const rawReleaseApiBaseUrl = environment.RELEASE_API_BASE_URL?.trim() ?? ''
+        if (!rawReleaseApiBaseUrl) {
             return undefined
         }
 
-        let publicBaseUrl: URL
+        let releaseApiBaseUrl: URL
         try {
-            publicBaseUrl = new URL(rawPublicBaseUrl)
+            releaseApiBaseUrl = new URL(rawReleaseApiBaseUrl)
         } catch {
-            throw new Error('AZURE_INSTALLER_PUBLIC_BASE_URL must be a valid HTTPS URL.')
+            throw new Error('RELEASE_API_BASE_URL must be a valid HTTPS URL.')
         }
 
         if (
-            publicBaseUrl.protocol !== 'https:' ||
-            !publicBaseUrl.hostname ||
-            publicBaseUrl.username ||
-            publicBaseUrl.password ||
-            publicBaseUrl.search ||
-            publicBaseUrl.hash
+            releaseApiBaseUrl.protocol !== 'https:' ||
+            !releaseApiBaseUrl.hostname ||
+            releaseApiBaseUrl.username ||
+            releaseApiBaseUrl.password ||
+            releaseApiBaseUrl.search ||
+            releaseApiBaseUrl.hash
         ) {
-            throw new Error('AZURE_INSTALLER_PUBLIC_BASE_URL must be a valid HTTPS URL.')
+            throw new Error('RELEASE_API_BASE_URL must be a valid HTTPS URL.')
         }
 
-        const normalizedBaseUrl = publicBaseUrl.toString().replace(/\/+$/, '')
+        const normalizedBaseUrl = releaseApiBaseUrl.toString().replace(/\/+$/, '')
 
         return {
             provider: 'generic',

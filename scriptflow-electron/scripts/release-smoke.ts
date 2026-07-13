@@ -100,8 +100,16 @@ assert(
     'The shared Azure SAS secret is required.',
 )
 assert(
-    releaseWorkflow.includes('public_base_url: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}'),
-    'The shared Azure public URL variable is required.',
+    releaseWorkflow.includes('download_base_url: ${{ vars.RELEASE_API_BASE_URL }}'),
+    'The release API URL must be passed to the Azure action for client download links.',
+)
+assert(
+    releaseWorkflow.includes('RELEASE_API_BASE_URL: ${{ vars.RELEASE_API_BASE_URL }}'),
+    'Packaged updater configuration must receive the release API URL.',
+)
+assert(
+    !releaseWorkflow.includes('AZURE_INSTALLER_PUBLIC_BASE_URL'),
+    'The release workflow must not use the retired public Azure URL.',
 )
 for (const requiredArtifact of [
     'ScriptFlow-${VERSION}-mac-arm64.dmg',
@@ -130,8 +138,16 @@ assert(
     'Installers must use versioned Azure paths.',
 )
 assert(
-    azureAction.includes('${PUBLIC_BASE_URL}/${APP_ID}/latest.json'),
-    'The website manifest must be published at the app root.',
+    azureAction.includes('STORAGE_BASE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER_NAME}"'),
+    'Private upload destinations must be derived from the Azure storage account and container.',
+)
+assert(
+    azureAction.includes('${STORAGE_BASE_URL}/${APP_ID}/latest.json'),
+    'The website manifest must be uploaded privately at the app root.',
+)
+assert(
+    azureAction.includes('url="${DOWNLOAD_BASE_URL}/${blob_path}"'),
+    'Installer metadata URLs must use the client-facing release API base.',
 )
 assert(azureAction.includes("default: 'updates'"), 'The updater prefix must default to updates.')
 assert(azureAction.includes('mapfile -t installer_paths'), 'Installer paths must be isolated from child stdin.')
@@ -141,6 +157,12 @@ assert(
     azureAction.includes('expected_platforms = {"macos", "windows", "linux"}'),
     'The website manifest must require all supported installer platforms.',
 )
+assert(
+    azureAction.includes('for expected_platform in macos windows linux') &&
+        azureAction.includes('Expected exactly one ${expected_platform} installer.'),
+    'The Azure action must reject incomplete or duplicate platform installer sets.',
+)
+assert(azureAction.includes('Expected exactly three installers'), 'The installer set must contain exactly three files.')
 for (const updaterKind of ['latest.yml', 'latest-mac.yml', 'zip', 'zip.blockmap', 'exe', 'exe.blockmap']) {
     assert(
         azureAction.includes(`Expected exactly one \${expected_updater_kind} updater file.`) &&
@@ -149,27 +171,53 @@ for (const updaterKind of ['latest.yml', 'latest-mac.yml', 'zip', 'zip.blockmap'
     )
 }
 assert(azureAction.includes('Expected exactly six updater files'), 'The updater feed must contain exactly six files.')
+assert(!azureAction.includes('if [[ "$updater_count" -gt 0 ]]'), 'An empty updater set must be rejected as incomplete.')
 assert(
-    azureAction.includes('${APP_ID}/${UPDATER_PREFIX}/${file_name}'),
-    'Updater files must use the dedicated updater prefix.',
+    azureAction.includes('${STORAGE_BASE_URL}/${APP_ID}/${UPDATER_PREFIX}/${file_name}'),
+    'Updater uploads must use the private storage URL and dedicated updater prefix.',
 )
 assert(
     azureAction.indexOf('upload_updater_files false') < azureAction.indexOf('upload_updater_files true'),
     'Updater payloads must be uploaded before updater manifests.',
 )
 assert(!azureAction.includes('docker run'), 'The Azure upload action must not depend on Docker.')
+assert(azureAction.includes('verify_remote_blob()'), 'The Azure action must verify uploaded blobs remotely.')
+assert(
+    azureAction.includes('"$(append_sas_token "${STORAGE_BASE_URL}/${blob_path}")"'),
+    'Remote blob verification must authenticate with the read-capable SAS token.',
+)
+assert(
+    azureAction.includes('cmp --silent "$source_path" "$downloaded_path"'),
+    'Remote blob verification must compare downloaded bytes with the local source.',
+)
+assert(
+    azureAction.includes('verify_remote_blob "$installer_path" "${APP_ID}/releases/${TAG}/${file_name}"'),
+    'All three validated installers must be verified after upload.',
+)
+assert(
+    azureAction.includes('verify_remote_blob "$updater_path" "${APP_ID}/${UPDATER_PREFIX}/${file_name}"'),
+    'All six validated updater files must be verified after upload.',
+)
+assert(
+    azureAction.includes('verify_remote_blob "$latest_json" "${APP_ID}/latest.json"'),
+    'latest.json must be verified after upload.',
+)
 
 assert(builderConfigService.includes("provider: 'generic'"), 'Packaged apps must use the generic updater provider.')
 assert(
-    builderConfigService.includes('environment.AZURE_INSTALLER_PUBLIC_BASE_URL'),
-    'The generic updater must use the shared public Azure URL.',
+    builderConfigService.includes('environment.RELEASE_API_BASE_URL'),
+    'The generic updater must use the release API URL.',
 )
 assert(builderConfigService.includes('/script-flow/updates`'), 'The updater URL must use the updates prefix.')
 assert(!builderConfigService.includes("provider: 'github'"), 'Packaged apps must no longer use the GitHub updater.')
 assert(
-    releaseWorkflow.includes('Verify public Azure release files'),
-    'Published release files must be checked through their anonymous URLs.',
+    !releaseWorkflow.includes('Verify public Azure release files') && !releaseWorkflow.includes('PUBLIC_BASE_URL'),
+    'The workflow must not perform anonymous Azure verification.',
 )
-console.log('✓ Placeholder releases, Azure uploads, and the generic updater are configured correctly.')
+assert(
+    !azureAction.includes('AZURE_INSTALLER_PUBLIC_BASE_URL') && !azureAction.includes('public_base_url'),
+    'The Azure action must not expose the retired public storage URL input.',
+)
+console.log('✓ Private Azure uploads, authenticated verification, and API client URLs are configured correctly.')
 
 console.log('\nRelease smoke checks passed.')

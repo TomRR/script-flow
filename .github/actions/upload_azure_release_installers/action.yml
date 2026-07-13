@@ -25,16 +25,14 @@ inputs:
     required: true
   updater_paths:
     description: 'Newline-separated updater payload and manifest paths to publish below updater_prefix.'
-    required: false
-    default: ''
+    required: true
   updater_prefix:
     description: 'Blob path below the app root used for updater payloads and manifests.'
     required: false
     default: 'updates'
-  public_base_url:
-    description: 'Optional public container URL. Defaults to the storage account blob endpoint plus container.'
-    required: false
-    default: ''
+  download_base_url:
+    description: 'HTTPS base URL exposed by the release API for client downloads.'
+    required: true
   azcopy_version:
     description: 'Pinned AzCopy release version used for uploads.'
     required: false
@@ -59,22 +57,20 @@ runs:
         INSTALLER_PATHS: ${{ inputs.installer_paths }}
         UPDATER_PATHS: ${{ inputs.updater_paths }}
         UPDATER_PREFIX: ${{ inputs.updater_prefix }}
-        PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+        DOWNLOAD_BASE_URL: ${{ inputs.download_base_url }}
         AZCOPY_VERSION: ${{ inputs.azcopy_version }}
         AZCOPY_SHA256: ${{ inputs.azcopy_sha256 }}
       run: |
         set -euo pipefail
 
-        if [[ -z "${PUBLIC_BASE_URL}" ]]; then
-          PUBLIC_BASE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER_NAME}"
-        fi
-
-        PUBLIC_BASE_URL="${PUBLIC_BASE_URL%/}"
+        STORAGE_BASE_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER_NAME}"
+        DOWNLOAD_BASE_URL="${DOWNLOAD_BASE_URL%/}"
         UPDATER_PREFIX="${UPDATER_PREFIX#/}"
         UPDATER_PREFIX="${UPDATER_PREFIX%/}"
 
-        if [[ ! "$PUBLIC_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]]; then
-          echo 'AZURE_INSTALLER_PUBLIC_BASE_URL must be an HTTPS URL.' >&2
+        if [[ ! "$DOWNLOAD_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]] || \
+          [[ "$DOWNLOAD_BASE_URL" == *'?'* || "$DOWNLOAD_BASE_URL" == *'#'* || "$DOWNLOAD_BASE_URL" == *'@'* ]]; then
+          echo 'download_base_url must be an HTTPS URL.' >&2
           exit 1
         fi
 
@@ -186,9 +182,6 @@ runs:
 
           file_name="$(basename "$installer_path")"
           blob_path="${APP_ID}/releases/${TAG}/${file_name}"
-          source_path="$(realpath "$installer_path")"
-          url="${PUBLIC_BASE_URL}/${blob_path}"
-          content_type="$(content_type_for "$file_name")"
           platform="$(platform_for "$file_name")"
 
           if [[ "$platform" == 'unknown' ]]; then
@@ -255,18 +248,16 @@ runs:
           updater_count=$((updater_count + 1))
         done
 
-        if [[ "$updater_count" -gt 0 ]]; then
-          for expected_updater_kind in latest.yml latest-mac.yml zip zip.blockmap exe exe.blockmap; do
-            if [[ "${updater_file_counts["$expected_updater_kind"]:-0}" -ne 1 ]]; then
-              echo "Expected exactly one ${expected_updater_kind} updater file." >&2
-              exit 1
-            fi
-          done
-
-          if [[ "$updater_count" -ne 6 ]]; then
-            echo "Expected exactly six updater files, got $updater_count." >&2
+        for expected_updater_kind in latest.yml latest-mac.yml zip zip.blockmap exe exe.blockmap; do
+          if [[ "${updater_file_counts["$expected_updater_kind"]:-0}" -ne 1 ]]; then
+            echo "Expected exactly one ${expected_updater_kind} updater file." >&2
             exit 1
           fi
+        done
+
+        if [[ "$updater_count" -ne 6 ]]; then
+          echo "Expected exactly six updater files, got $updater_count." >&2
+          exit 1
         fi
 
         for installer_path in "${installer_paths[@]}"; do
@@ -277,11 +268,11 @@ runs:
           file_name="$(basename "$installer_path")"
           blob_path="${APP_ID}/releases/${TAG}/${file_name}"
           source_path="$(realpath "$installer_path")"
-          url="${PUBLIC_BASE_URL}/${blob_path}"
+          url="${DOWNLOAD_BASE_URL}/${blob_path}"
           content_type="$(content_type_for "$file_name")"
           platform="$(platform_for "$file_name")"
 
-          azcopy_upload "$source_path" "$(append_sas_token "$url")" "$content_type"
+          azcopy_upload "$source_path" "$(append_sas_token "${STORAGE_BASE_URL}/${blob_path}")" "$content_type"
 
           sha256="$(sha256sum "$installer_path" | awk '{print $1}')"
           size_bytes="$(wc -c < "$installer_path" | tr -d '[:space:]')"
@@ -340,7 +331,7 @@ runs:
             handle.write("\n")
         PY
 
-        latest_url="$(append_sas_token "${PUBLIC_BASE_URL}/${APP_ID}/latest.json")"
+        latest_url="$(append_sas_token "${STORAGE_BASE_URL}/${APP_ID}/latest.json")"
         azcopy_upload "$latest_json" "$latest_url" 'application/json'
 
         upload_updater_files() {
@@ -362,10 +353,50 @@ runs:
             fi
 
             source_path="$(realpath "$updater_path")"
-            destination_url="$(append_sas_token "${PUBLIC_BASE_URL}/${APP_ID}/${UPDATER_PREFIX}/${file_name}")"
+            destination_url="$(append_sas_token "${STORAGE_BASE_URL}/${APP_ID}/${UPDATER_PREFIX}/${file_name}")"
             azcopy_upload "$source_path" "$destination_url" "$(content_type_for "$file_name")"
           done
         }
 
         upload_updater_files false
         upload_updater_files true
+
+        verification_dir="${work_dir}/verified"
+        verification_index=0
+        mkdir -p "$verification_dir"
+
+        verify_remote_blob() {
+          local source_path="$1"
+          local blob_path="$2"
+          local downloaded_path="${verification_dir}/${verification_index}"
+
+          verification_index=$((verification_index + 1))
+          curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 3 \
+            --output "$downloaded_path" \
+            "$(append_sas_token "${STORAGE_BASE_URL}/${blob_path}")"
+
+          if ! cmp --silent "$source_path" "$downloaded_path"; then
+            echo "Uploaded blob does not match its source: $blob_path" >&2
+            exit 1
+          fi
+        }
+
+        for installer_path in "${installer_paths[@]}"; do
+          if [[ -z "$installer_path" ]]; then
+            continue
+          fi
+
+          file_name="$(basename "$installer_path")"
+          verify_remote_blob "$installer_path" "${APP_ID}/releases/${TAG}/${file_name}"
+        done
+
+        for updater_path in "${updater_paths[@]}"; do
+          if [[ -z "$updater_path" ]]; then
+            continue
+          fi
+
+          file_name="$(basename "$updater_path")"
+          verify_remote_blob "$updater_path" "${APP_ID}/${UPDATER_PREFIX}/${file_name}"
+        done
+
+        verify_remote_blob "$latest_json" "${APP_ID}/latest.json"
