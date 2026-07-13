@@ -37,7 +37,7 @@ export class DesktopBuilderConfigService {
     }
 
     static resolveAzurePublishConfig(environment: NodeJS.ProcessEnv = process.env): GenericPublishConfig | undefined {
-        const rawReleaseApiBaseUrl = environment.RELEASE_API_BASE_URL?.trim() ?? ''
+        const rawReleaseApiBaseUrl = environment.AZURE_INSTALLER_PUBLIC_BASE_URL?.trim() ?? ''
         if (!rawReleaseApiBaseUrl) {
             return undefined
         }
@@ -46,7 +46,7 @@ export class DesktopBuilderConfigService {
         try {
             releaseApiBaseUrl = new URL(rawReleaseApiBaseUrl)
         } catch {
-            throw new Error('RELEASE_API_BASE_URL must be a valid HTTPS URL.')
+            throw new Error('AZURE_INSTALLER_PUBLIC_BASE_URL must be a valid HTTPS URL.')
         }
 
         if (
@@ -57,7 +57,7 @@ export class DesktopBuilderConfigService {
             releaseApiBaseUrl.search ||
             releaseApiBaseUrl.hash
         ) {
-            throw new Error('RELEASE_API_BASE_URL must be a valid HTTPS URL.')
+            throw new Error('AZURE_INSTALLER_PUBLIC_BASE_URL must be a valid HTTPS URL.')
         }
 
         const normalizedBaseUrl = releaseApiBaseUrl.toString().replace(/\/+$/, '')

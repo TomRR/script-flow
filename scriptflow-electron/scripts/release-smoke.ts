@@ -100,16 +100,12 @@ assert(
     'The shared Azure SAS secret is required.',
 )
 assert(
-    releaseWorkflow.includes('download_base_url: ${{ vars.RELEASE_API_BASE_URL }}'),
+    releaseWorkflow.includes('download_base_url: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}'),
     'The release API URL must be passed to the Azure action for client download links.',
 )
 assert(
-    releaseWorkflow.includes('RELEASE_API_BASE_URL: ${{ vars.RELEASE_API_BASE_URL }}'),
+    releaseWorkflow.includes('AZURE_INSTALLER_PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}'),
     'Packaged updater configuration must receive the release API URL.',
-)
-assert(
-    !releaseWorkflow.includes('AZURE_INSTALLER_PUBLIC_BASE_URL'),
-    'The release workflow must not use the retired public Azure URL.',
 )
 for (const requiredArtifact of [
     'ScriptFlow-${VERSION}-mac-arm64.dmg',
@@ -205,13 +201,13 @@ assert(
 
 assert(builderConfigService.includes("provider: 'generic'"), 'Packaged apps must use the generic updater provider.')
 assert(
-    builderConfigService.includes('environment.RELEASE_API_BASE_URL'),
+    builderConfigService.includes('environment.AZURE_INSTALLER_PUBLIC_BASE_URL'),
     'The generic updater must use the release API URL.',
 )
 assert(builderConfigService.includes('/script-flow/updates`'), 'The updater URL must use the updates prefix.')
 assert(!builderConfigService.includes("provider: 'github'"), 'Packaged apps must no longer use the GitHub updater.')
 assert(
-    !releaseWorkflow.includes('Verify public Azure release files') && !releaseWorkflow.includes('PUBLIC_BASE_URL'),
+    !releaseWorkflow.includes('Verify public Azure release files') && !releaseWorkflow.includes('curl --fail'),
     'The workflow must not perform anonymous Azure verification.',
 )
 assert(

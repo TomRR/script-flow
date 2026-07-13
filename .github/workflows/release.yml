@@ -138,7 +138,7 @@ jobs:
         env:
           AZURE_INSTALLER_STORAGE_ACCOUNT: ${{ vars.AZURE_INSTALLER_STORAGE_ACCOUNT }}
           AZURE_INSTALLER_CONTAINER_NAME: ${{ vars.AZURE_INSTALLER_CONTAINER_NAME }}
-          RELEASE_API_BASE_URL: ${{ vars.RELEASE_API_BASE_URL }}
+          AZURE_INSTALLER_PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
           AZURE_INSTALLER_SAS_TOKEN: ${{ secrets.AZURE_INSTALLER_SAS_TOKEN }}
         run: |
           if [[ -z "$AZURE_INSTALLER_STORAGE_ACCOUNT" ]]; then
@@ -149,13 +149,13 @@ jobs:
             echo 'Missing required GitHub variable: AZURE_INSTALLER_CONTAINER_NAME' >&2
             exit 1
           fi
-          if [[ -z "$RELEASE_API_BASE_URL" ]]; then
-            echo 'Missing required GitHub variable: RELEASE_API_BASE_URL' >&2
+          if [[ -z "$AZURE_INSTALLER_PUBLIC_BASE_URL" ]]; then
+            echo 'Missing required GitHub variable: AZURE_INSTALLER_PUBLIC_BASE_URL' >&2
             exit 1
           fi
-          if [[ ! "$RELEASE_API_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]] || \
-            [[ "$RELEASE_API_BASE_URL" == *'?'* || "$RELEASE_API_BASE_URL" == *'#'* || "$RELEASE_API_BASE_URL" == *'@'* ]]; then
-            echo 'RELEASE_API_BASE_URL must be an HTTPS URL.' >&2
+          if [[ ! "$AZURE_INSTALLER_PUBLIC_BASE_URL" =~ ^https://[^[:space:]=]+(/[^[:space:]=]*)?$ ]] || \
+            [[ "$AZURE_INSTALLER_PUBLIC_BASE_URL" == *'?'* || "$AZURE_INSTALLER_PUBLIC_BASE_URL" == *'#'* || "$AZURE_INSTALLER_PUBLIC_BASE_URL" == *'@'* ]]; then
+            echo 'AZURE_INSTALLER_PUBLIC_BASE_URL must be an HTTPS URL.' >&2
             exit 1
           fi
           if [[ -z "$AZURE_INSTALLER_SAS_TOKEN" ]]; then
@@ -237,7 +237,7 @@ jobs:
       - name: Build & Package
         shell: bash
         env:
-          RELEASE_API_BASE_URL: ${{ vars.RELEASE_API_BASE_URL }}
+          AZURE_INSTALLER_PUBLIC_BASE_URL: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -375,7 +375,7 @@ jobs:
           storage_account: ${{ vars.AZURE_INSTALLER_STORAGE_ACCOUNT }}
           container_name: ${{ vars.AZURE_INSTALLER_CONTAINER_NAME }}
           sas_token: ${{ secrets.AZURE_INSTALLER_SAS_TOKEN }}
-          download_base_url: ${{ vars.RELEASE_API_BASE_URL }}
+          download_base_url: ${{ vars.AZURE_INSTALLER_PUBLIC_BASE_URL }}
           installer_paths: |
             ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-mac-arm64.dmg
             ./scriptflow-electron/release-assets/ScriptFlow-${{ needs.preflight.outputs.version }}-win-x64.exe

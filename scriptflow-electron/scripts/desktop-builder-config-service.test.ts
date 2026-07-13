@@ -25,7 +25,7 @@ describe('DesktopBuilderConfigService', () => {
 
     test('creates a generic updater configuration from the release API URL', () => {
         const config = DesktopBuilderConfigService.createBuilderConfig(createOptions(), {
-            RELEASE_API_BASE_URL: 'https://releases.example.com',
+            AZURE_INSTALLER_PUBLIC_BASE_URL: 'https://releases.example.com',
         })
 
         expect(config.publish).toEqual([
@@ -39,7 +39,7 @@ describe('DesktopBuilderConfigService', () => {
     test('normalizes trailing slashes in the release API updater URL', () => {
         expect(
             DesktopBuilderConfigService.resolveAzurePublishConfig({
-                RELEASE_API_BASE_URL: '  https://releases.example.com///  ',
+                AZURE_INSTALLER_PUBLIC_BASE_URL: '  https://releases.example.com///  ',
             }),
         ).toEqual({
             provider: 'generic',
@@ -53,14 +53,6 @@ describe('DesktopBuilderConfigService', () => {
         expect(config.publish).toBeUndefined()
     })
 
-    test('does not use the retired public Azure URL for updater configuration', () => {
-        expect(
-            DesktopBuilderConfigService.resolveAzurePublishConfig({
-                AZURE_INSTALLER_PUBLIC_BASE_URL: 'https://storage.example.com/installers',
-            }),
-        ).toBeUndefined()
-    })
-
     test.each([
         'not-a-url',
         'http://downloads.example.com/installers',
@@ -70,9 +62,9 @@ describe('DesktopBuilderConfigService', () => {
     ])('rejects invalid release API URL %s', (url) => {
         expect(() =>
             DesktopBuilderConfigService.resolveAzurePublishConfig({
-                RELEASE_API_BASE_URL: url,
+                AZURE_INSTALLER_PUBLIC_BASE_URL: url,
             }),
-        ).toThrow('RELEASE_API_BASE_URL must be a valid HTTPS URL.')
+        ).toThrow('AZURE_INSTALLER_PUBLIC_BASE_URL must be a valid HTTPS URL.')
     })
 
     test('creates Windows icon config for the app and NSIS installer surfaces', () => {
